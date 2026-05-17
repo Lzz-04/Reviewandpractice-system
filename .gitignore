@@ -6,6 +6,11 @@ target/
 *.class
 *.jar
 *.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
 !.mvn/wrapper/maven-wrapper.jar
 *.db
 .idea/
@@ -13,3 +18,7 @@ target/
 .vscode/
 .env
 .env.local
+*.log
+*.ctxt
+.mtj.tmp/
+hs_err_pid*

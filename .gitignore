@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.output/
+.nuxt/
+target/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+*.db
+.idea/
+*.iml
+.vscode/
+.env
+.env.local

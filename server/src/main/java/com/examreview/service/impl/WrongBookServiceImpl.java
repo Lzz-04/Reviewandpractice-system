@@ -1,0 +1,132 @@
+package com.examreview.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.examreview.dto.WrongQuestionDTO;
+import com.examreview.entity.Question;
+import com.examreview.entity.WrongQuestion;
+import com.examreview.exception.BusinessException;
+import com.examreview.mapper.QuestionMapper;
+import com.examreview.mapper.WrongQuestionMapper;
+import com.examreview.service.WrongBookService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class WrongBookServiceImpl implements WrongBookService {
+
+    private final WrongQuestionMapper wrongQuestionMapper;
+    private final QuestionMapper questionMapper;
+
+    @Override
+    public List<WrongQuestionDTO> getList(Integer subjectId, Integer mastered) {
+        LambdaQueryWrapper<WrongQuestion> wrapper = new LambdaQueryWrapper<>();
+        if (subjectId != null) {
+            wrapper.eq(WrongQuestion::getSubjectId, subjectId);
+        }
+        if (mastered != null) {
+            wrapper.eq(WrongQuestion::getMastered, mastered);
+        }
+        wrapper.orderByDesc(WrongQuestion::getLastWrongAt);
+        List<WrongQuestion> list = wrongQuestionMapper.selectList(wrapper);
+
+        if (list.isEmpty()) {
+            return List.of();
+        }
+
+        // 批量加载关联的题目
+        List<Integer> questionIds = list.stream().map(WrongQuestion::getQuestionId).collect(Collectors.toList());
+        List<Question> questions = questionMapper.selectBatchIds(questionIds);
+        Map<Integer, Question> questionMap = questions.stream()
+                .collect(Collectors.toMap(Question::getId, q -> q));
+
+        List<WrongQuestionDTO> result = new ArrayList<>();
+        for (WrongQuestion wq : list) {
+            WrongQuestionDTO dto = new WrongQuestionDTO();
+            dto.setId(wq.getId());
+            dto.setQuestionId(wq.getQuestionId());
+            dto.setSubjectId(wq.getSubjectId());
+            dto.setChapterId(wq.getChapterId());
+            dto.setWrongCount(wq.getWrongCount());
+            dto.setLastWrongAt(wq.getLastWrongAt());
+            dto.setReviewedCount(wq.getReviewedCount());
+            dto.setMastered(wq.getMastered());
+
+            Question q = questionMap.get(wq.getQuestionId());
+            if (q != null) {
+                dto.setType(q.getType());
+                dto.setContent(q.getContent());
+                dto.setOptions(q.getOptions());
+                dto.setAnswer(q.getAnswer());
+                dto.setAnalysis(q.getAnalysis());
+            }
+            result.add(dto);
+        }
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> getStats() {
+        long total = wrongQuestionMapper.selectCount(null);
+        long masteredCount = wrongQuestionMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestion>().eq(WrongQuestion::getMastered, 1));
+        return Map.of("total", total, "mastered", masteredCount, "unMastered", total - masteredCount);
+    }
+
+    @Override
+    public void review(Integer id) {
+        WrongQuestion wq = wrongQuestionMapper.selectById(id);
+        if (wq == null) {
+            throw new BusinessException("错题记录不存在");
+        }
+        wq.setReviewedCount(wq.getReviewedCount() + 1);
+        wrongQuestionMapper.updateById(wq);
+    }
+
+    @Override
+    public void master(Integer id) {
+        WrongQuestion wq = wrongQuestionMapper.selectById(id);
+        if (wq == null) {
+            throw new BusinessException("错题记录不存在");
+        }
+        wq.setMastered(wq.getMastered() == 1 ? 0 : 1);
+        wrongQuestionMapper.updateById(wq);
+    }
+
+    @Override
+    public void remove(Integer id) {
+        WrongQuestion wq = wrongQuestionMapper.selectById(id);
+        if (wq == null) {
+            throw new BusinessException("错题记录不存在");
+        }
+        wrongQuestionMapper.deleteById(id);
+    }
+
+    @Override
+    public void upsertWrongQuestion(Question question) {
+        WrongQuestion existing = wrongQuestionMapper.selectOne(
+                new LambdaQueryWrapper<WrongQuestion>()
+                        .eq(WrongQuestion::getQuestionId, question.getId()));
+
+        if (existing != null) {
+            existing.setWrongCount(existing.getWrongCount() + 1);
+            existing.setLastWrongAt(java.time.LocalDateTime.now());
+            wrongQuestionMapper.updateById(existing);
+        } else {
+            WrongQuestion wq = new WrongQuestion();
+            wq.setQuestionId(question.getId());
+            wq.setSubjectId(question.getSubjectId());
+            wq.setChapterId(question.getChapterId());
+            wq.setWrongCount(1);
+            wq.setLastWrongAt(java.time.LocalDateTime.now());
+            wq.setReviewedCount(0);
+            wq.setMastered(0);
+            wrongQuestionMapper.insert(wq);
+        }
+    }
+}

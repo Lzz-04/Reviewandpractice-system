@@ -1,6 +1,4 @@
-CREATE DATABASE IF NOT EXISTS exam_review DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE exam_review;
-
+-- 数据库由 JDBC URL 中的 createDatabaseIfNotExist=true 自动创建
 -- 科目表
 CREATE TABLE IF NOT EXISTS subjects (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -82,7 +80,9 @@ CREATE TABLE IF NOT EXISTS exam_records (
     total_questions INT DEFAULT 0,
     correct_count INT DEFAULT 0,
     wrong_count INT DEFAULT 0,
+    status VARCHAR(16) DEFAULT 'in_progress' COMMENT 'in_progress/paused/finished',
     duration_used INT DEFAULT 0 COMMENT '实际用时(秒)',
+    duration_remaining INT DEFAULT 0 COMMENT '暂停时剩余时间(秒)',
     started_at DATETIME DEFAULT NULL,
     finished_at DATETIME DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -106,12 +106,19 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
     FOREIGN KEY (chapter_id) REFERENCES chapters(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 外键补充
+ALTER TABLE exam_records ADD FOREIGN KEY (exam_id) REFERENCES exam_papers(id);
+
 -- 索引
 CREATE INDEX idx_questions_chapter ON questions(chapter_id);
 CREATE INDEX idx_questions_subject ON questions(subject_id);
 CREATE INDEX idx_questions_type ON questions(type);
+CREATE INDEX idx_questions_difficulty ON questions(difficulty);
 CREATE INDEX idx_answer_records_session ON answer_records(session_id);
 CREATE INDEX idx_answer_records_question ON answer_records(question_id);
+CREATE INDEX idx_answer_records_exam ON answer_records(exam_id);
+CREATE INDEX idx_answer_records_answered_at ON answer_records(answered_at);
 CREATE INDEX idx_exam_records_subject ON exam_records(subject_id);
+CREATE INDEX idx_exam_records_exam ON exam_records(exam_id);
 CREATE INDEX idx_wrong_questions_subject ON wrong_questions(subject_id);
 CREATE INDEX idx_chapters_subject ON chapters(subject_id);

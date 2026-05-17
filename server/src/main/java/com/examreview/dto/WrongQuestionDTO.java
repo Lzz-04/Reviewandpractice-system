@@ -21,4 +21,5 @@ public class WrongQuestionDTO {
     private String options;
     private String answer;
     private String analysis;
+    private Integer difficulty;
 }

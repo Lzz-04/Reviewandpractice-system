@@ -36,6 +36,13 @@
       </div>
     </div>
 
+    <!-- 练习按钮 -->
+    <div v-if="stats.unMastered > 0" class="practice-action">
+      <el-button type="primary" size="large" @click="startWrongPractice" :icon="EditPen">
+        练习全部未掌握错题
+      </el-button>
+    </div>
+
     <!-- 筛选 -->
     <div class="filter-bar">
       <el-select v-model="filterSubjectId" placeholder="按科目筛选" clearable @change="loadList" size="large">
@@ -119,9 +126,10 @@
 
 <script setup>
 import { ElMessage } from 'element-plus'
-import { Document, CircleCheckFilled, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
+import { Document, CircleCheckFilled, WarningFilled, InfoFilled, EditPen } from '@element-plus/icons-vue'
 
 const api = useApi()
+const questionStore = useQuestionStore()
 const subjects = ref([])
 const stats = ref({ total: 0, mastered: 0, unMastered: 0 })
 const list = ref([])
@@ -166,6 +174,26 @@ async function handleMaster(item) {
 async function handleRemove(id) {
   await api.delete(`/wrongbook/${id}`)
   await Promise.all([loadList(), loadStats()])
+}
+
+async function startWrongPractice() {
+  const subjectId = filterSubjectId.value
+  try {
+    const api = useApi()
+    const url = subjectId ? `/practice/wrong/${subjectId}` : '/practice/wrong'
+    const data = await api.get(url, { unMasteredOnly: true })
+    questionStore.sessionId = data.sessionId
+    questionStore.questions = data.questions
+    questionStore.currentIndex = 0
+    questionStore.answers = {}
+    questionStore.results = {}
+    questionStore.mode = 'wrong'
+    if (questionStore.questions.length === 0) {
+      ElMessage.info('没有待复习的错题')
+      return
+    }
+    navigateTo(`/practice/0`)
+  } catch {}
 }
 
 onMounted(async () => {
@@ -213,6 +241,10 @@ onMounted(async () => {
   font-size: 12px;
   color: #94a3b8;
   margin-top: 2px;
+}
+
+.practice-action {
+  margin-bottom: 20px;
 }
 
 .filter-bar {

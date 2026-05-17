@@ -15,6 +15,8 @@ public interface ExamService {
     ExamPaper generate(ExamGenerateDTO dto);
     ExamRecord startExam(Integer examId);
     ExamResultDTO submitExam(ExamSubmitDTO dto);
+    void pauseExam(Integer recordId, Integer remainingSeconds);
+    ExamRecord resumeExam(Integer recordId);
     List<ExamRecord> getRecords();
     ExamResultDTO getRecordDetail(Integer recordId);
     void deleteExam(Integer id);

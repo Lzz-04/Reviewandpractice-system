@@ -112,14 +112,46 @@
     </el-dialog>
 
     <!-- 题目列表对话框 -->
-    <el-dialog v-model="showQuestions" :title="questionChapter?.name + ' - 题目列表'" width="750px" @closed="questionChapter = null">
+    <el-dialog v-model="showQuestions" :title="questionChapter?.name + ' - 题目列表'" width="800px" @closed="questionChapter = null; batchIds = []">
       <div v-loading="loadingQuestions">
+        <!-- 搜索和筛选 -->
+        <div class="q-toolbar">
+          <el-input v-model="qSearch.keyword" placeholder="搜索题目内容..." clearable @input="loadQuestions" style="width: 200px">
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+          <el-select v-model="qSearch.difficulty" placeholder="难度" clearable @change="loadQuestions" style="width: 100px">
+            <el-option label="难度1" :value="1" /><el-option label="难度2" :value="2" />
+            <el-option label="难度3" :value="3" /><el-option label="难度4" :value="4" />
+            <el-option label="难度5" :value="5" />
+          </el-select>
+          <el-select v-model="qSearch.sortBy" placeholder="排序" clearable @change="loadQuestions" style="width: 120px">
+            <el-option label="默认(最新)" value="" /><el-option label="按难度" value="difficulty" />
+          </el-select>
+          <el-select v-model="qSearch.type" placeholder="题型" clearable @change="loadQuestions" style="width: 110px">
+            <el-option label="单选题" value="single" /><el-option label="多选题" value="multiple" />
+            <el-option label="判断题" value="judge" />
+          </el-select>
+        </div>
+
+        <!-- 批量操作栏 -->
+        <div v-if="batchIds.length > 0" class="q-batch-bar">
+          <span>已选 {{ batchIds.length }} 道题目</span>
+          <el-button size="small" @click="showBatchChapter = true">批量移动章节</el-button>
+          <el-button size="small" @click="showBatchDifficulty = true">批量修改难度</el-button>
+          <el-popconfirm title="确定删除？" @confirm="handleBatchDelete">
+            <template #reference><el-button size="small" type="danger">批量删除</el-button></template>
+          </el-popconfirm>
+          <el-button size="small" @click="batchIds = []">取消选择</el-button>
+        </div>
+
         <el-empty v-if="!loadingQuestions && questions.length === 0" description="该章节下没有题目" />
         <div v-else class="question-list-dialog">
           <div v-for="(q, i) in questions" :key="q.id" class="q-item">
+            <el-checkbox :model-value="batchIds.includes(q.id)" @change="toggleBatch(q.id)" />
             <span class="q-index">{{ i + 1 }}</span>
             <span class="q-type">{{ typeLabel(q.type) }}</span>
-            <span class="q-content">{{ truncateText(q.content, 50) }}</span>
+            <span class="q-diff" v-if="q.difficulty">L{{ q.difficulty }}</span>
+            <span class="q-content">{{ truncateText(q.content, 45) }}</span>
             <span class="q-answer" :class="q.type === 'judge' ? 'judge-answer' : ''">{{ formatAnswer(q.answer, q.type) }}</span>
             <el-popconfirm title="确定删除该题目？" @confirm="handleDeleteQuestion(q.id)">
               <template #reference>
@@ -131,6 +163,30 @@
       </div>
       <template #footer>
         <el-button @click="showQuestions = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量修改章节 -->
+    <el-dialog v-model="showBatchChapter" title="批量移动章节" width="400px">
+      <el-select v-model="batchChapterId" placeholder="选择目标章节" style="width: 100%">
+        <el-option v-for="ch in chapters" :key="ch.id" :label="ch.name" :value="ch.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="showBatchChapter = false">取消</el-button>
+        <el-button type="primary" @click="handleBatchUpdateChapter" :disabled="!batchChapterId">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量修改难度 -->
+    <el-dialog v-model="showBatchDifficulty" title="批量修改难度" width="400px">
+      <el-select v-model="batchDifficulty" placeholder="选择难度" style="width: 100%">
+        <el-option label="难度1 (简单)" :value="1" /><el-option label="难度2" :value="2" />
+        <el-option label="难度3 (中等)" :value="3" /><el-option label="难度4" :value="4" />
+        <el-option label="难度5 (困难)" :value="5" />
+      </el-select>
+      <template #footer>
+        <el-button @click="showBatchDifficulty = false">取消</el-button>
+        <el-button type="primary" @click="handleBatchUpdateDifficulty" :disabled="!batchDifficulty">确定</el-button>
       </template>
     </el-dialog>
 
@@ -157,7 +213,7 @@
 
 <script setup>
 import { ElMessage } from 'element-plus'
-import { Plus, ArrowLeft, Edit, Tickets, Upload, UploadFilled, Delete } from '@element-plus/icons-vue'
+import { Plus, ArrowLeft, Edit, Tickets, Upload, UploadFilled, Delete, Search } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const api = useApi()
@@ -178,6 +234,12 @@ const showQuestions = ref(false)
 const questionChapter = ref(null)
 const questions = ref([])
 const loadingQuestions = ref(false)
+const qSearch = ref({ keyword: '', difficulty: null, sortBy: '', type: '' })
+const batchIds = ref([])
+const showBatchChapter = ref(false)
+const showBatchDifficulty = ref(false)
+const batchChapterId = ref(null)
+const batchDifficulty = ref(null)
 
 const showExamDialog = ref(false)
 const examChapter = ref(null)
@@ -262,9 +324,20 @@ async function handleImport() {
 async function viewQuestions(ch) {
   questionChapter.value = ch
   showQuestions.value = true
+  qSearch.value = { keyword: '', difficulty: null, sortBy: '', type: '' }
+  batchIds.value = []
+  await loadQuestions()
+}
+
+async function loadQuestions() {
   loadingQuestions.value = true
   try {
-    const data = await api.get('/questions', { chapterId: ch.id, pageSize: 1000 })
+    const params = { chapterId: questionChapter.value.id, pageSize: 1000 }
+    if (qSearch.value.keyword) params.keyword = qSearch.value.keyword
+    if (qSearch.value.difficulty) params.difficulty = qSearch.value.difficulty
+    if (qSearch.value.sortBy) params.sortBy = qSearch.value.sortBy
+    if (qSearch.value.type) params.type = qSearch.value.type
+    const data = await api.get('/questions', params)
     questions.value = data.records || data || []
   } catch {
     questions.value = []
@@ -273,13 +346,50 @@ async function viewQuestions(ch) {
   }
 }
 
+function toggleBatch(id) {
+  const idx = batchIds.value.indexOf(id)
+  if (idx === -1) batchIds.value.push(id)
+  else batchIds.value.splice(idx, 1)
+}
+
 async function handleDeleteQuestion(id) {
   try {
     await api.delete(`/questions/${id}`)
     questions.value = questions.value.filter(q => q.id !== id)
+    batchIds.value = batchIds.value.filter(bid => bid !== id)
   } catch {
     // 错误提示已在 useApi 中处理
   }
+}
+
+async function handleBatchDelete() {
+  try {
+    const config = useRuntimeConfig()
+    await $fetch(`${config.public.apiBase}/questions/batch`, { method: 'DELETE', body: batchIds.value })
+    ElMessage.success('批量删除成功')
+    batchIds.value = []
+    await loadQuestions()
+  } catch {}
+}
+
+async function handleBatchUpdateChapter() {
+  try {
+    await api.put('/questions/batch', { ids: batchIds.value, chapterId: batchChapterId.value })
+    ElMessage.success('批量移动成功')
+    showBatchChapter.value = false
+    batchIds.value = []
+    await loadQuestions()
+  } catch {}
+}
+
+async function handleBatchUpdateDifficulty() {
+  try {
+    await api.put('/questions/batch', { ids: batchIds.value, difficulty: batchDifficulty.value })
+    ElMessage.success('批量修改难度成功')
+    showBatchDifficulty.value = false
+    batchIds.value = []
+    await loadQuestions()
+  } catch {}
 }
 
 function startPractice(ch) { navigateTo(`/practice/${ch.id}`) }
@@ -436,6 +546,26 @@ onMounted(load)
   max-height: 50vh;
   overflow-y: auto;
 }
+.q-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.q-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #1e40af;
+  flex-wrap: wrap;
+}
+.q-batch-bar span { font-weight: 600; }
 .q-item {
   display: flex;
   align-items: center;
@@ -465,6 +595,15 @@ onMounted(load)
   background: #eff6ff;
   color: #3b5dbf;
   flex-shrink: 0;
+}
+.q-diff {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #fef6ee;
+  color: #e0781a;
+  flex-shrink: 0;
+  font-weight: 600;
 }
 .q-content {
   flex: 1;

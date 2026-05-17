@@ -18,15 +18,26 @@ export const useQuestionStore = defineStore('question', () => {
 
   const answeredCount = computed(() => Object.keys(answers.value).length)
 
-  async function startSession(chapterId, practiceMode = 'random') {
+  async function startSession(chapterId, practiceMode = 'random', wrongOnly = false) {
     const api = useApi()
-    const data = await api.get(`/practice/start/${chapterId}`, { mode: practiceMode })
+    const data = await api.get(`/practice/start/${chapterId}`, { mode: practiceMode, wrongOnly })
     sessionId.value = data.sessionId
     questions.value = data.questions
     currentIndex.value = 0
     answers.value = {}
     results.value = {}
     mode.value = practiceMode
+  }
+
+  async function startWrongSession(subjectId, unMasteredOnly = false) {
+    const api = useApi()
+    const data = await api.get(`/practice/wrong/${subjectId}`, { unMasteredOnly })
+    sessionId.value = data.sessionId
+    questions.value = data.questions
+    currentIndex.value = 0
+    answers.value = {}
+    results.value = {}
+    mode.value = 'wrong'
   }
 
   async function submitAnswer(questionId, selectedAnswer, timeSpent = 0) {
@@ -62,6 +73,6 @@ export const useQuestionStore = defineStore('question', () => {
   return {
     sessionId, questions, currentIndex, answers, results, mode,
     currentQuestion, progress, answeredCount,
-    startSession, submitAnswer, nextQuestion, prevQuestion, reset,
+    startSession, startWrongSession, submitAnswer, nextQuestion, prevQuestion, reset,
   }
 })

@@ -20,6 +20,8 @@ public class ExamRecord {
     private Integer correctCount;
     private Integer wrongCount;
     private Integer durationUsed;
+    private Integer durationRemaining;
+    private String status;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
     private LocalDateTime createdAt;

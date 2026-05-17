@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,7 +30,10 @@ public class QuestionServiceImpl implements QuestionService {
     private final ExamQuestionMapper examQuestionMapper;
 
     @Override
-    public Page<Question> getList(Integer page, Integer pageSize, Integer subjectId, Integer chapterId, String type) {
+    public Page<Question> getList(Integer page, Integer pageSize, Integer subjectId, Integer chapterId, String type,
+                                   String keyword, Integer difficulty, String sortBy) {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
         LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<>();
         if (subjectId != null) {
             wrapper.eq(Question::getSubjectId, subjectId);
@@ -40,7 +44,17 @@ public class QuestionServiceImpl implements QuestionService {
         if (type != null && !type.isEmpty()) {
             wrapper.eq(Question::getType, type);
         }
-        wrapper.orderByDesc(Question::getCreatedAt);
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            wrapper.like(Question::getContent, keyword.trim());
+        }
+        if (difficulty != null) {
+            wrapper.eq(Question::getDifficulty, difficulty);
+        }
+        if ("difficulty".equals(sortBy)) {
+            wrapper.orderByAsc(Question::getDifficulty).orderByDesc(Question::getCreatedAt);
+        } else {
+            wrapper.orderByDesc(Question::getCreatedAt);
+        }
         return questionMapper.selectPage(new Page<>(page, pageSize), wrapper);
     }
 
@@ -55,8 +69,34 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Question create(Question question) {
+        validateQuestion(question);
+        if (question.getOptions() == null || question.getOptions().isEmpty()) {
+            question.setOptions("[]");
+        }
         questionMapper.insert(question);
         return question;
+    }
+
+    private void validateQuestion(Question question) {
+        if (question.getChapterId() == null) {
+            throw new BusinessException("所属章节不能为空");
+        }
+        if (question.getSubjectId() == null) {
+            throw new BusinessException("所属科目不能为空");
+        }
+        if (question.getType() == null || question.getType().trim().isEmpty()) {
+            throw new BusinessException("题型不能为空");
+        }
+        List<String> validTypes = Arrays.asList("single", "multiple", "judge");
+        if (!validTypes.contains(question.getType())) {
+            throw new BusinessException("无效题型：" + question.getType() + "，有效值为 single/multiple/judge");
+        }
+        if (question.getContent() == null || question.getContent().trim().isEmpty()) {
+            throw new BusinessException("题目内容不能为空");
+        }
+        if (question.getAnswer() == null || question.getAnswer().trim().isEmpty()) {
+            throw new BusinessException("答案不能为空");
+        }
     }
 
     @Override

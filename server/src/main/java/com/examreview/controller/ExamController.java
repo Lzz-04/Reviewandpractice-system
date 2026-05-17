@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/exams")
@@ -50,6 +51,17 @@ public class ExamController {
     @GetMapping("/records")
     public ApiResponse<List<ExamRecord>> getRecords() {
         return ApiResponse.ok(examService.getRecords());
+    }
+
+    @PostMapping("/records/{id}/pause")
+    public ApiResponse<Void> pauseExam(@PathVariable Integer id, @RequestBody Map<String, Integer> body) {
+        examService.pauseExam(id, body.getOrDefault("remainingSeconds", 0));
+        return ApiResponse.ok(null, "已暂停");
+    }
+
+    @PostMapping("/records/{id}/resume")
+    public ApiResponse<ExamRecord> resumeExam(@PathVariable Integer id) {
+        return ApiResponse.ok(examService.resumeExam(id));
     }
 
     @GetMapping("/records/{id}")

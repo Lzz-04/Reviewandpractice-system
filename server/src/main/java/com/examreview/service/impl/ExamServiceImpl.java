@@ -62,6 +62,10 @@ public class ExamServiceImpl implements ExamService {
     @Override
     @Transactional
     public ExamPaper generate(ExamGenerateDTO dto) {
+        // 校验科目存在
+        if (subjectMapper.selectById(dto.getSubjectId()) == null) {
+            throw new BusinessException("科目不存在");
+        }
         // 查询题目池
         List<Question> pool = questionMapper.selectBySubject(dto.getSubjectId());
         if (dto.getChapterIds() != null && !dto.getChapterIds().isEmpty()) {
@@ -118,11 +122,20 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public ExamRecord startExam(Integer examId) {
         ExamPaper paper = getById(examId);
+        // 检查是否已有进行中的考试记录
+        Long inProgressCount = examRecordMapper.selectCount(
+                new LambdaQueryWrapper<ExamRecord>()
+                        .eq(ExamRecord::getExamId, examId)
+                        .eq(ExamRecord::getStatus, "in_progress"));
+        if (inProgressCount > 0) {
+            throw new BusinessException("该考试已有进行中的记录，请先完成或暂停后再开始");
+        }
         ExamRecord record = new ExamRecord();
         record.setExamId(examId);
         record.setSubjectId(paper.getSubjectId());
         record.setTotalQuestions(paper.getQuestionCount());
         record.setStartedAt(LocalDateTime.now());
+        record.setStatus("in_progress");
         examRecordMapper.insert(record);
         return record;
     }
@@ -200,6 +213,7 @@ public class ExamServiceImpl implements ExamService {
         record.setCorrectCount(correctCount);
         record.setWrongCount(wrongCount);
         record.setFinishedAt(now);
+        record.setStatus("finished");
         if (record.getStartedAt() != null) {
             record.setDurationUsed((int) Duration.between(record.getStartedAt(), now).getSeconds());
         }
@@ -207,6 +221,45 @@ public class ExamServiceImpl implements ExamService {
 
         // 构建返回结果
         return buildResultDTO(record, examQuestions, questionMap, answerMap);
+    }
+
+    @Override
+    public void pauseExam(Integer recordId, Integer remainingSeconds) {
+        ExamRecord record = examRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new BusinessException("考试记录不存在");
+        }
+        if (!"in_progress".equals(record.getStatus())) {
+            throw new BusinessException("考试未在进行中，无法暂停");
+        }
+        record.setStatus("paused");
+        record.setDurationRemaining(remainingSeconds);
+        examRecordMapper.updateById(record);
+    }
+
+    @Override
+    public ExamRecord resumeExam(Integer recordId) {
+        ExamRecord record = examRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new BusinessException("考试记录不存在");
+        }
+        if (!"paused".equals(record.getStatus())) {
+            throw new BusinessException("考试未处于暂停状态");
+        }
+        if (record.getFinishedAt() != null) {
+            throw new BusinessException("考试已交卷，无法恢复");
+        }
+        record.setStatus("in_progress");
+        // 更新开始时间以正确计算考试用时
+        long elapsedSeconds = record.getDurationUsed() != null ? record.getDurationUsed() : 0;
+        long remainingSeconds = record.getDurationRemaining() != null ? record.getDurationRemaining() : 0;
+        record.setStartedAt(LocalDateTime.now().minusSeconds(elapsedSeconds));
+        long totalDuration = elapsedSeconds + remainingSeconds;
+        if (totalDuration > 0) {
+            record.setDurationRemaining(null); // 清空暂停剩余时间
+        }
+        examRecordMapper.updateById(record);
+        return record;
     }
 
     @Override

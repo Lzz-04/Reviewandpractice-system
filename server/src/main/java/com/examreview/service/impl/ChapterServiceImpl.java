@@ -32,6 +32,9 @@ public class ChapterServiceImpl implements ChapterService {
 
     @Override
     public Chapter create(Chapter chapter) {
+        if (chapter.getName() == null || chapter.getName().trim().isEmpty()) {
+            throw new BusinessException("章节名称不能为空");
+        }
         // 自动分配 sort_order：当前科目下最大值 + 1
         List<Chapter> existing = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>()

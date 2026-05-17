@@ -23,6 +23,9 @@ public class StatsController {
 
     @GetMapping("/accuracy/trend")
     public ApiResponse<List<Map<String, Object>>> getAccuracyTrend(@RequestParam(defaultValue = "7") int days) {
+        if (days <= 0) {
+            return ApiResponse.fail("查询天数必须大于0");
+        }
         return ApiResponse.ok(statsService.getAccuracyTrend(days));
     }
 
@@ -33,6 +36,9 @@ public class StatsController {
 
     @GetMapping("/daily/activity")
     public ApiResponse<List<Map<String, Object>>> getDailyActivity(@RequestParam(defaultValue = "30") int days) {
+        if (days <= 0) {
+            return ApiResponse.fail("查询天数必须大于0");
+        }
         return ApiResponse.ok(statsService.getDailyActivity(days));
     }
 }

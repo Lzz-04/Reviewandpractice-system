@@ -64,6 +64,7 @@ public class WrongBookServiceImpl implements WrongBookService {
                 dto.setOptions(q.getOptions());
                 dto.setAnswer(q.getAnswer());
                 dto.setAnalysis(q.getAnalysis());
+                dto.setDifficulty(q.getDifficulty());
             }
             result.add(dto);
         }

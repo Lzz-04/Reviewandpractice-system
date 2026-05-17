@@ -1,6 +1,17 @@
 <template>
   <div class="page-container">
-    <div v-if="!examStore.started">
+    <div v-if="showResume" class="resume-dialog">
+      <div class="resume-card">
+        <div class="resume-badge">考试已暂停</div>
+        <div class="resume-meta">你有一个未完成的考试，可以继续作答</div>
+        <div class="resume-actions">
+          <el-button type="primary" size="large" @click="handleResume">继续考试</el-button>
+          <el-button size="large" @click="navigateTo('/exam')">返回列表</el-button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="!examStore.started && !showResume">
       <el-skeleton :rows="8" animated />
     </div>
 
@@ -20,6 +31,9 @@
           </div>
           <span class="progress-num">{{ examStore.progress.current }}/{{ examStore.progress.total }}</span>
         </div>
+        <el-button type="warning" size="large" @click="handlePause" class="pause-btn" :loading="pausing">
+          暂停
+        </el-button>
         <el-button type="danger" size="large" @click="handleSubmit" class="submit-btn">
           交卷
         </el-button>
@@ -93,6 +107,8 @@
 </template>
 
 <script setup>
+import { ElMessage } from 'element-plus'
+
 const route = useRoute()
 const api = useApi()
 const examStore = useExamStore()
@@ -101,6 +117,9 @@ const timerDuration = ref(30)
 const timerRemaining = ref(1800)
 const timerFormatTime = ref('30:00')
 const timerMinutes = computed(() => Math.floor(timerRemaining.value / 60))
+const pausing = ref(false)
+const showResume = ref(false)
+const pausedRecordId = ref(null)
 let timerInterval = null
 
 function startTimer() {
@@ -115,7 +134,19 @@ function startTimer() {
 
 onMounted(async () => {
   const examId = route.params.examId
-  if (!examStore.started) await examStore.startExam(examId)
+  // 检查是否有暂停的考试可恢复
+  if (!examStore.started) {
+    try {
+      const records = await api.get('/exams/records')
+      const paused = records.find(r => r.examId === parseInt(examId) && r.status === 'paused')
+      if (paused) {
+        pausedRecordId.value = paused.id
+        showResume.value = true
+        return
+      }
+    } catch {}
+    await examStore.startExam(examId)
+  }
   try {
     const paper = await api.get(`/exams/${examId}`)
     timerDuration.value = paper.duration
@@ -128,6 +159,22 @@ onMounted(async () => {
   } catch {}
 })
 
+async function handleResume() {
+  try {
+    const record = await api.post(`/exams/records/${pausedRecordId.value}/resume`)
+    examStore.recordId = record.id
+    examStore.started = true
+    timerRemaining.value = record.durationRemaining || timerDuration.value * 60
+    timerFormatTime.value = `${String(Math.floor(timerRemaining.value / 60)).padStart(2, '0')}:${String(timerRemaining.value % 60).padStart(2, '0')}`
+    const paper = await api.get(`/exams/${route.params.examId}`)
+    const questions = await api.get('/questions', { subjectId: paper.subjectId, pageSize: 100 })
+    const shuffled = [...(questions.records || questions)].sort(() => Math.random() - 0.5)
+    examStore.setQuestions(shuffled.slice(0, paper.questionCount), paper.duration)
+    showResume.value = false
+    startTimer()
+  } catch {}
+}
+
 function handleSelect(answer) {
   if (examStore.currentQuestion) examStore.selectAnswer(examStore.currentQuestion.id, answer)
 }
@@ -137,10 +184,70 @@ async function handleSubmit() {
   await examStore.submitExam()
 }
 
+async function handlePause() {
+  pausing.value = true
+  clearInterval(timerInterval)
+  try {
+    await api.post(`/exams/records/${examStore.recordId}/pause`, { remainingSeconds: timerRemaining.value })
+    ElMessage.success('考试已暂停，可稍后继续')
+    navigateTo('/exam')
+  } catch {
+    startTimer()
+  } finally {
+    pausing.value = false
+  }
+}
+
 onUnmounted(() => clearInterval(timerInterval))
 </script>
 
 <style scoped>
+/* Resume Dialog */
+.resume-dialog {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.resume-card {
+  text-align: center;
+  background: #fff;
+  border: 1px solid #e8e5df;
+  border-radius: 16px;
+  padding: 48px 64px;
+  box-shadow: 0 4px 24px rgba(22,27,43,0.06);
+  animation: popIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.resume-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  background: #fffbeb;
+  color: #d97706;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.resume-meta {
+  font-size: 15px;
+  color: #64748b;
+  margin-bottom: 24px;
+}
+
+.resume-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
 /* Top Bar */
 .exam-topbar {
   display: flex;

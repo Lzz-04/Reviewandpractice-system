@@ -4,11 +4,19 @@
       <template #content><span class="header-title">刷题练习</span></template>
     </el-page-header>
 
+    <!-- 模式选择 -->
+    <div v-if="!store.questions.length && !loading" class="mode-select">
+      <el-radio-group v-model="practiceMode" @change="startWithMode" size="large">
+        <el-radio-button value="all">全部题目</el-radio-button>
+        <el-radio-button value="wrong">只练错题</el-radio-button>
+      </el-radio-group>
+    </div>
+
     <div v-if="store.questions.length > 0" class="practice-area">
       <!-- 进度条 -->
       <div class="progress-section">
         <div class="progress-stats">
-          <span>第 {{ store.progress.current }} / {{ store.progress.total }} 题</span>
+          <span>{{ store.mode === 'wrong' ? '错题练习 · ' : '' }}第 {{ store.progress.current }} / {{ store.progress.total }} 题</span>
         </div>
         <div class="progress-track">
           <div class="progress-fill" :style="{ width: store.progress.percent + '%' }"></div>
@@ -88,10 +96,27 @@ const store = useQuestionStore()
 const showResult = ref(false)
 const currentResult = ref(null)
 const loading = ref(false)
+const practiceMode = ref('all')
+
+async function startWithMode(mode) {
+  loading.value = true
+  try {
+    const chapterId = route.params.chapterId
+    await store.startSession(chapterId, 'random', mode === 'wrong')
+  } finally { loading.value = false }
+}
 
 onMounted(async () => {
   loading.value = true
-  try { await store.startSession(route.params.chapterId, 'random') } finally { loading.value = false }
+  try {
+    const chapterId = route.params.chapterId
+    // 如果 store 中已有错题数据（从错题本页面跳转过来），直接使用
+    if (store.questions.length > 0 && store.mode === 'wrong') {
+      loading.value = false
+      return
+    }
+    await store.startSession(chapterId, 'random')
+  } finally { loading.value = false }
 })
 
 function handleSelect(answer) {
@@ -121,6 +146,11 @@ function handleFinish() {
 </script>
 
 <style scoped>
+.mode-select {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
 .practice-header {
   margin-bottom: 24px;
 }

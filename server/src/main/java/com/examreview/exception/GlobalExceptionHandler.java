@@ -29,6 +29,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception e) {
         log.error("服务器内部错误", e);
-        return ApiResponse.fail(500, "服务器内部错误: " + e.getMessage());
+        return ApiResponse.fail(500, "服务器内部错误，请稍后重试");
     }
 }

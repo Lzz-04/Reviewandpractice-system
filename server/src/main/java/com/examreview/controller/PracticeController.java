@@ -39,7 +39,7 @@ public class PracticeController {
         }
         List<Question> questions;
         if (wrongOnly) {
-            List<WrongQuestionDTO> wrongList = wrongBookService.getList(null, 0);
+            List<WrongQuestionDTO> wrongList = wrongBookService.getList(1, 10000, null, 0).getRecords();
             Set<Integer> wrongChapterIds = wrongList.stream()
                     .map(WrongQuestionDTO::getChapterId).collect(Collectors.toSet());
             if (!wrongChapterIds.contains(chapterId)) {
@@ -71,7 +71,7 @@ public class PracticeController {
     public ApiResponse<Map<String, Object>> startWrongPractice(
             @PathVariable(required = false) Integer subjectId,
             @RequestParam(defaultValue = "false") boolean unMasteredOnly) {
-        List<WrongQuestionDTO> wrongList = wrongBookService.getList(subjectId, unMasteredOnly ? 0 : null);
+        List<WrongQuestionDTO> wrongList = wrongBookService.getList(1, 10000, subjectId, unMasteredOnly ? 0 : null).getRecords();
         List<Question> questions = wrongList.stream()
                 .map(this::toQuestion)
                 .collect(Collectors.toList());

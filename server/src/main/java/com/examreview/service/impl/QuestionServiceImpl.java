@@ -119,6 +119,14 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
+    @Transactional
+    public void batchDelete(List<Integer> ids) {
+        for (Integer id : ids) {
+            delete(id);
+        }
+    }
+
+    @Override
     public List<Question> getRandomQuestions(Integer chapterId, Integer count) {
         List<Question> all = questionMapper.selectByChapter(chapterId);
         Collections.shuffle(all);

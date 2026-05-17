@@ -35,13 +35,17 @@ public class ExamServiceImpl implements ExamService {
     private final SubjectMapper subjectMapper;
 
     @Override
-    public List<ExamPaper> getList(Integer subjectId) {
+    public com.baomidou.mybatisplus.extension.plugins.pagination.Page<ExamPaper> getList(
+            Integer page, Integer pageSize, Integer subjectId) {
+        if (page == null || page < 1) page = 1;
+        if (pageSize == null || pageSize < 1) pageSize = 20;
         LambdaQueryWrapper<ExamPaper> wrapper = new LambdaQueryWrapper<>();
         if (subjectId != null) {
             wrapper.eq(ExamPaper::getSubjectId, subjectId);
         }
         wrapper.orderByDesc(ExamPaper::getCreatedAt);
-        return examPaperMapper.selectList(wrapper);
+        return examPaperMapper.selectPage(
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, pageSize), wrapper);
     }
 
     @Override
@@ -207,6 +211,9 @@ public class ExamServiceImpl implements ExamService {
                     .divide(BigDecimal.valueOf(record.getTotalQuestions()), 1, RoundingMode.HALF_UP);
         }
 
+        // 保存 sessionId 到考试记录，用于后续精确查询答题记录
+        record.setSessionId(sessionId);
+
         // 更新考试记录
         LocalDateTime now = LocalDateTime.now();
         record.setScore(score);
@@ -215,7 +222,9 @@ public class ExamServiceImpl implements ExamService {
         record.setFinishedAt(now);
         record.setStatus("finished");
         if (record.getStartedAt() != null) {
-            record.setDurationUsed((int) Duration.between(record.getStartedAt(), now).getSeconds());
+            int currentSessionElapsed = (int) Duration.between(record.getStartedAt(), now).getSeconds();
+            int previousElapsed = record.getDurationUsed() != null ? record.getDurationUsed() : 0;
+            record.setDurationUsed(previousElapsed + Math.max(currentSessionElapsed, 0));
         }
         examRecordMapper.updateById(record);
 
@@ -231,6 +240,11 @@ public class ExamServiceImpl implements ExamService {
         }
         if (!"in_progress".equals(record.getStatus())) {
             throw new BusinessException("考试未在进行中，无法暂停");
+        }
+        // 保存已消耗时间，用于恢复后正确累加
+        if (record.getStartedAt() != null) {
+            int elapsed = (int) Duration.between(record.getStartedAt(), LocalDateTime.now()).getSeconds();
+            record.setDurationUsed(Math.max(elapsed, 0));
         }
         record.setStatus("paused");
         record.setDurationRemaining(remainingSeconds);
@@ -250,21 +264,20 @@ public class ExamServiceImpl implements ExamService {
             throw new BusinessException("考试已交卷，无法恢复");
         }
         record.setStatus("in_progress");
-        // 更新开始时间以正确计算考试用时
-        long elapsedSeconds = record.getDurationUsed() != null ? record.getDurationUsed() : 0;
-        long remainingSeconds = record.getDurationRemaining() != null ? record.getDurationRemaining() : 0;
-        record.setStartedAt(LocalDateTime.now().minusSeconds(elapsedSeconds));
-        long totalDuration = elapsedSeconds + remainingSeconds;
-        if (totalDuration > 0) {
-            record.setDurationRemaining(null); // 清空暂停剩余时间
-        }
+        // 重置计时起点为当前时间，已消耗时间在 pauseExam 中已保存到 duration_used
+        record.setStartedAt(LocalDateTime.now());
+        record.setDurationRemaining(null);
         examRecordMapper.updateById(record);
         return record;
     }
 
     @Override
-    public List<ExamRecord> getRecords() {
-        return examRecordMapper.selectList(
+    public com.baomidou.mybatisplus.extension.plugins.pagination.Page<ExamRecord> getRecords(
+            Integer page, Integer pageSize) {
+        if (page == null || page < 1) page = 1;
+        if (pageSize == null || pageSize < 1) pageSize = 20;
+        return examRecordMapper.selectPage(
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, pageSize),
                 new LambdaQueryWrapper<ExamRecord>().orderByDesc(ExamRecord::getCreatedAt));
     }
 
@@ -280,10 +293,16 @@ public class ExamServiceImpl implements ExamService {
         Map<Integer, Question> questionMap = questions.stream()
                 .collect(Collectors.toMap(Question::getId, q -> q));
 
-        // 查询答题记录
-        List<AnswerRecord> answers = answerRecordMapper.selectList(
-                new LambdaQueryWrapper<AnswerRecord>()
-                        .eq(AnswerRecord::getExamId, record.getExamId()));
+        // 按 sessionId 精确查询本次考试的答题记录，避免多次考试混在一起
+        LambdaQueryWrapper<AnswerRecord> answerWrapper = new LambdaQueryWrapper<>();
+        if (record.getSessionId() != null) {
+            answerWrapper.eq(AnswerRecord::getSessionId, record.getSessionId());
+        } else {
+            // 兼容旧记录（无 sessionId），按 examId + 时间范围回退
+            answerWrapper.eq(AnswerRecord::getExamId, record.getExamId())
+                         .between(AnswerRecord::getAnsweredAt, record.getStartedAt(), record.getFinishedAt());
+        }
+        List<AnswerRecord> answers = answerRecordMapper.selectList(answerWrapper);
 
         Map<Integer, String> answerMap = new HashMap<>();
         for (AnswerRecord ar : answers) {
@@ -294,6 +313,17 @@ public class ExamServiceImpl implements ExamService {
     }
 
     @Override
+    public List<Question> getExamQuestions(Integer examId) {
+        List<ExamQuestion> examQuestions = examQuestionMapper.selectByExamId(examId);
+        List<Integer> qIds = examQuestions.stream().map(ExamQuestion::getQuestionId).collect(Collectors.toList());
+        if (qIds.isEmpty()) return Collections.emptyList();
+        List<Question> questions = questionMapper.selectBatchIds(qIds);
+        Map<Integer, Question> qMap = questions.stream().collect(Collectors.toMap(Question::getId, q -> q));
+        return examQuestions.stream().map(eq -> qMap.get(eq.getQuestionId())).filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
     public void deleteExam(Integer id) {
         getById(id);
         // 先删答题记录，再删除考试记录，最后删试卷关联和试卷

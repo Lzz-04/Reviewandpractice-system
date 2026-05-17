@@ -57,19 +57,20 @@ public class QuestionController {
         if (ids == null || ids.isEmpty()) {
             return ApiResponse.fail("题目ID列表不能为空");
         }
-        for (Integer id : ids) {
-            questionService.delete(id);
-        }
+        questionService.batchDelete(ids);
         return ApiResponse.ok(null, "批量删除成功");
     }
 
     @PutMapping("/batch")
     public ApiResponse<Void> batchUpdate(@RequestBody Map<String, Object> body) {
         @SuppressWarnings("unchecked")
-        List<Integer> ids = (List<Integer>) body.get("ids");
-        if (ids == null || ids.isEmpty()) {
+        List<Object> rawIds = (List<Object>) body.get("ids");
+        if (rawIds == null || rawIds.isEmpty()) {
             return ApiResponse.fail("题目ID列表不能为空");
         }
+        List<Integer> ids = rawIds.stream()
+                .map(o -> o instanceof Number ? ((Number) o).intValue() : Integer.parseInt(o.toString()))
+                .toList();
         Integer chapterId = body.get("chapterId") != null ? ((Number) body.get("chapterId")).intValue() : null;
         Integer difficulty = body.get("difficulty") != null ? ((Number) body.get("difficulty")).intValue() : null;
         for (Integer id : ids) {

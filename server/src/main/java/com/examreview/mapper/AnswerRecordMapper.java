@@ -32,4 +32,14 @@ public interface AnswerRecordMapper extends BaseMapper<AnswerRecord> {
     @Select("SELECT COUNT(DISTINCT question_id) FROM answer_records " +
             "WHERE question_id IN (SELECT id FROM questions WHERE subject_id = #{subjectId})")
     Long countDistinctQuestionsBySubject(@Param("subjectId") Integer subjectId);
+
+    @Select("SELECT s.id as subjectId, s.name as subjectName, " +
+            "COUNT(DISTINCT q.id) as totalQuestions, " +
+            "COUNT(DISTINCT ar.question_id) as answeredCount, " +
+            "IFNULL(ROUND(SUM(CASE WHEN ar.is_correct = 1 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(DISTINCT ar.question_id), 0), 1), 0) as accuracy " +
+            "FROM subjects s " +
+            "LEFT JOIN questions q ON q.subject_id = s.id " +
+            "LEFT JOIN answer_records ar ON ar.question_id = q.id " +
+            "GROUP BY s.id, s.name ORDER BY s.sort_order")
+    List<Map<String, Object>> getSubjectProgressBatch();
 }

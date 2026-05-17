@@ -24,7 +24,11 @@ public class WrongBookServiceImpl implements WrongBookService {
     private final QuestionMapper questionMapper;
 
     @Override
-    public List<WrongQuestionDTO> getList(Integer subjectId, Integer mastered) {
+    public com.baomidou.mybatisplus.extension.plugins.pagination.Page<WrongQuestionDTO> getList(
+            Integer page, Integer pageSize, Integer subjectId, Integer mastered) {
+        if (page == null || page < 1) page = 1;
+        if (pageSize == null || pageSize < 1) pageSize = 20;
+
         LambdaQueryWrapper<WrongQuestion> wrapper = new LambdaQueryWrapper<>();
         if (subjectId != null) {
             wrapper.eq(WrongQuestion::getSubjectId, subjectId);
@@ -33,10 +37,18 @@ public class WrongBookServiceImpl implements WrongBookService {
             wrapper.eq(WrongQuestion::getMastered, mastered);
         }
         wrapper.orderByDesc(WrongQuestion::getLastWrongAt);
-        List<WrongQuestion> list = wrongQuestionMapper.selectList(wrapper);
+
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<WrongQuestion> mpPage =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, pageSize);
+        mpPage = wrongQuestionMapper.selectPage(mpPage, wrapper);
+        List<WrongQuestion> list = mpPage.getRecords();
+
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<WrongQuestionDTO> resultPage =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, pageSize, mpPage.getTotal());
 
         if (list.isEmpty()) {
-            return List.of();
+            resultPage.setRecords(java.util.Collections.emptyList());
+            return resultPage;
         }
 
         // 批量加载关联的题目
@@ -68,7 +80,8 @@ public class WrongBookServiceImpl implements WrongBookService {
             }
             result.add(dto);
         }
-        return result;
+        resultPage.setRecords(result);
+        return resultPage;
     }
 
     @Override

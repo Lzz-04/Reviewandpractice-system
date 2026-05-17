@@ -73,7 +73,10 @@ const genForm = ref({ subjectId: null, title: '', duration: 30, totalCount: 20 }
 async function loadSubjects() { subjects.value = await api.get('/subjects').catch(() => []) }
 async function loadExams() {
   loading.value = true
-  try { exams.value = await api.get('/exams') } finally { loading.value = false }
+  try {
+    const page = await api.get('/exams', { pageSize: 100 })
+    exams.value = page.records || []
+  } finally { loading.value = false }
 }
 const chapters = ref([])
 
@@ -87,13 +90,11 @@ async function handleGenerate() {
   if (!genForm.value.title.trim()) { ElMessage.warning('请输入考试标题'); return }
   const paper = await api.post('/exams/generate', genForm.value)
   await loadExams()
-  await examStore.startExam(paper.id)
   ElMessage.success('组卷成功')
   navigateTo(`/exam/start/${paper.id}`)
 }
 
 async function startExam(row) {
-  await examStore.startExam(row.id)
   navigateTo(`/exam/start/${row.id}`)
 }
 

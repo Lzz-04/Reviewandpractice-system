@@ -107,7 +107,13 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 外键补充
-ALTER TABLE exam_records ADD FOREIGN KEY (exam_id) REFERENCES exam_papers(id);
+ALTER TABLE exam_records ADD FOREIGN KEY IF NOT EXISTS (exam_id) REFERENCES exam_papers(id);
+
+-- 增量迁移：为已有数据库补充缺失字段（continue-on-error: true 保障兼容性）
+ALTER TABLE exam_records ADD COLUMN IF NOT EXISTS status VARCHAR(16) DEFAULT 'in_progress' COMMENT 'in_progress/paused/finished';
+ALTER TABLE exam_records ADD COLUMN IF NOT EXISTS duration_remaining INT DEFAULT 0 COMMENT '暂停时剩余时间(秒)';
+ALTER TABLE exam_records ADD COLUMN IF NOT EXISTS session_id VARCHAR(128) DEFAULT NULL COMMENT '答题批次标识，用于精确关联本次答题记录';
+ALTER TABLE subjects ADD UNIQUE INDEX idx_subjects_name (name);
 
 -- 索引
 CREATE INDEX idx_questions_chapter ON questions(chapter_id);

@@ -134,27 +134,39 @@ function startTimer() {
 
 onMounted(async () => {
   const examId = route.params.examId
-  // 检查是否有暂停的考试可恢复
   if (!examStore.started) {
     try {
-      const records = await api.get('/exams/records')
+      // 检查是否有暂停或进行中的考试可恢复
+      const page = await api.get('/exams/records', { pageSize: 100 })
+      const records = page.records || []
       const paused = records.find(r => r.examId === parseInt(examId) && r.status === 'paused')
       if (paused) {
         pausedRecordId.value = paused.id
         showResume.value = true
         return
       }
+      const inProgress = records.find(r => r.examId === parseInt(examId) && r.status === 'in_progress')
+      if (inProgress) {
+        // 有进行中的记录，先暂停再恢复
+        await api.post(`/exams/records/${inProgress.id}/pause`, { remainingSeconds: 0 })
+        pausedRecordId.value = inProgress.id
+        showResume.value = true
+        return
+      }
     } catch {}
-    await examStore.startExam(examId)
+    try {
+      await examStore.startExam(examId)
+    } catch {
+      return
+    }
   }
   try {
     const paper = await api.get(`/exams/${examId}`)
     timerDuration.value = paper.duration
     timerRemaining.value = paper.duration * 60
     timerFormatTime.value = `${String(paper.duration).padStart(2, '0')}:00`
-    const questions = await api.get('/questions', { subjectId: paper.subjectId, pageSize: 100 })
-    const shuffled = [...(questions.records || questions)].sort(() => Math.random() - 0.5)
-    examStore.setQuestions(shuffled.slice(0, paper.questionCount), paper.duration)
+    const questions = await api.get(`/exams/${examId}/questions`)
+    examStore.setQuestions(questions, paper.duration)
     startTimer()
   } catch {}
 })
@@ -167,9 +179,9 @@ async function handleResume() {
     timerRemaining.value = record.durationRemaining || timerDuration.value * 60
     timerFormatTime.value = `${String(Math.floor(timerRemaining.value / 60)).padStart(2, '0')}:${String(timerRemaining.value % 60).padStart(2, '0')}`
     const paper = await api.get(`/exams/${route.params.examId}`)
-    const questions = await api.get('/questions', { subjectId: paper.subjectId, pageSize: 100 })
-    const shuffled = [...(questions.records || questions)].sort(() => Math.random() - 0.5)
-    examStore.setQuestions(shuffled.slice(0, paper.questionCount), paper.duration)
+    timerDuration.value = paper.duration
+    const questions = await api.get(`/exams/${route.params.examId}/questions`)
+    examStore.setQuestions(questions, paper.duration)
     showResume.value = false
     startTimer()
   } catch {}
@@ -181,7 +193,13 @@ function handleSelect(answer) {
 
 async function handleSubmit() {
   clearInterval(timerInterval)
-  await examStore.submitExam()
+  try {
+    await examStore.submitExam()
+  } catch {
+    // 交卷失败，恢复计时器让用户可以重试
+    ElMessage.error('交卷失败，请重试')
+    startTimer()
+  }
 }
 
 async function handlePause() {
@@ -190,6 +208,7 @@ async function handlePause() {
   try {
     await api.post(`/exams/records/${examStore.recordId}/pause`, { remainingSeconds: timerRemaining.value })
     ElMessage.success('考试已暂停，可稍后继续')
+    examStore.reset()
     navigateTo('/exam')
   } catch {
     startTimer()
@@ -198,7 +217,10 @@ async function handlePause() {
   }
 }
 
-onUnmounted(() => clearInterval(timerInterval))
+onUnmounted(() => {
+  clearInterval(timerInterval)
+  examStore.reset()
+})
 </script>
 
 <style scoped>

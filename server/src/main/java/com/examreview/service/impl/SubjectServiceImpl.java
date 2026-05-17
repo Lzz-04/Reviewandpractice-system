@@ -9,6 +9,7 @@ import com.examreview.mapper.SubjectMapper;
 import com.examreview.service.SubjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -79,6 +80,7 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional
     public void delete(Integer id) {
         getById(id);
         // 检查是否存在关联章节

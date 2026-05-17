@@ -11,15 +11,12 @@ export const useApi = () => {
       headers['Content-Type'] = 'application/json'
     }
     try {
-      const { data, error } = await useFetch(`${baseURL}${url}`, {
-        ...options,
+      const result = await $fetch(`${baseURL}${url}`, {
+        method,
         headers,
+        body: options.body,
+        params: options.params,
       })
-      if (error.value) {
-        ElMessage.error(error.value.message || '网络请求失败')
-        throw new Error(error.value.message)
-      }
-      const result = data.value
       if (result.code !== 200) {
         ElMessage.error(result.message || '请求失败')
         throw new Error(result.message)

@@ -11,6 +11,7 @@ public interface QuestionService {
     Question create(Question question);
     Question update(Integer id, Question question);
     void delete(Integer id);
+    void batchDelete(List<Integer> ids);
     List<Question> getRandomQuestions(Integer chapterId, Integer count);
     List<Question> getQuestionsByIds(List<Integer> ids);
 }

@@ -45,13 +45,27 @@
 
     <!-- 筛选 -->
     <div class="filter-bar">
-      <el-select v-model="filterSubjectId" placeholder="按科目筛选" clearable @change="loadList" size="large">
+      <el-select v-model="filterSubjectId" placeholder="按科目筛选" clearable @change="onFilterChange" size="large">
         <el-option v-for="s in subjects" :key="s.id" :label="s.name" :value="s.id" />
       </el-select>
-      <el-select v-model="filterMastered" placeholder="掌握状态" clearable @change="loadList" size="large" style="width: 130px">
+      <el-select v-model="filterMastered" placeholder="掌握状态" clearable @change="onFilterChange" size="large" style="width: 130px">
         <el-option label="未掌握" :value="0" />
         <el-option label="已掌握" :value="1" />
       </el-select>
+    </div>
+
+    <!-- 分页 -->
+    <div v-if="total > pageSize" class="pagination-wrap">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        @size-change="loadList"
+        @current-change="loadList"
+        background
+      />
     </div>
 
     <!-- 题目列表 -->
@@ -136,6 +150,9 @@ const list = ref([])
 const loading = ref(false)
 const filterSubjectId = ref(null)
 const filterMastered = ref(null)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 
 function typeLabel(type) {
   return { single: '单选题', multiple: '多选题', judge: '判断题' }[type] || ''
@@ -150,14 +167,20 @@ function isCorrectOption(item, label) {
   return correct.includes(label)
 }
 
+function onFilterChange() {
+  currentPage.value = 1
+  loadList()
+}
 async function loadStats() { try { stats.value = await api.get('/wrongbook/stats') } catch {} }
 async function loadList() {
   loading.value = true
   try {
-    const params = {}
+    const params = { page: currentPage.value, pageSize: pageSize.value }
     if (filterSubjectId.value) params.subjectId = filterSubjectId.value
     if (filterMastered.value !== null) params.mastered = filterMastered.value
-    list.value = await api.get('/wrongbook', params)
+    const page = await api.get('/wrongbook', params)
+    list.value = page.records || []
+    total.value = page.total || 0
   } finally { loading.value = false }
 }
 
@@ -404,5 +427,11 @@ onMounted(async () => {
   padding: 12px 20px;
   border-top: 1px solid #f0ede7;
   justify-content: flex-end;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
 }
 </style>

@@ -3,10 +3,10 @@ package com.examreview.controller;
 import com.examreview.dto.ApiResponse;
 import com.examreview.dto.WrongQuestionDTO;
 import com.examreview.service.WrongBookService;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -17,10 +17,12 @@ public class WrongBookController {
     private final WrongBookService wrongBookService;
 
     @GetMapping
-    public ApiResponse<List<WrongQuestionDTO>> getList(
+    public ApiResponse<Page<WrongQuestionDTO>> getList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize,
             @RequestParam(required = false) Integer subjectId,
             @RequestParam(required = false) Integer mastered) {
-        return ApiResponse.ok(wrongBookService.getList(subjectId, mastered));
+        return ApiResponse.ok(wrongBookService.getList(page, pageSize, subjectId, mastered));
     }
 
     @GetMapping("/stats")

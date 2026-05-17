@@ -1,5 +1,6 @@
 package com.examreview.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.examreview.dto.*;
 import com.examreview.entity.ExamPaper;
 import com.examreview.entity.ExamRecord;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import com.examreview.entity.Question;
+
 @RestController
 @RequestMapping("/api/exams")
 @RequiredArgsConstructor
@@ -19,8 +22,11 @@ public class ExamController {
     private final ExamService examService;
 
     @GetMapping
-    public ApiResponse<List<ExamPaper>> getList(@RequestParam(required = false) Integer subjectId) {
-        return ApiResponse.ok(examService.getList(subjectId));
+    public ApiResponse<Page<ExamPaper>> getList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize,
+            @RequestParam(required = false) Integer subjectId) {
+        return ApiResponse.ok(examService.getList(page, pageSize, subjectId));
     }
 
     @GetMapping("/{id}")
@@ -49,8 +55,10 @@ public class ExamController {
     }
 
     @GetMapping("/records")
-    public ApiResponse<List<ExamRecord>> getRecords() {
-        return ApiResponse.ok(examService.getRecords());
+    public ApiResponse<Page<ExamRecord>> getRecords(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ApiResponse.ok(examService.getRecords(page, pageSize));
     }
 
     @PostMapping("/records/{id}/pause")
@@ -67,6 +75,11 @@ public class ExamController {
     @GetMapping("/records/{id}")
     public ApiResponse<ExamResultDTO> getRecordDetail(@PathVariable Integer id) {
         return ApiResponse.ok(examService.getRecordDetail(id));
+    }
+
+    @GetMapping("/{id}/questions")
+    public ApiResponse<List<Question>> getExamQuestions(@PathVariable Integer id) {
+        return ApiResponse.ok(examService.getExamQuestions(id));
     }
 
     @DeleteMapping("/{id}")

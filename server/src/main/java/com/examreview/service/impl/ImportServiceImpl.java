@@ -5,6 +5,7 @@ import com.examreview.entity.Question;
 import com.examreview.mapper.QuestionMapper;
 import com.examreview.service.ImportService;
 import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
 public class ImportServiceImpl implements ImportService {
 
     private final QuestionMapper questionMapper;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
     @Transactional
@@ -346,19 +348,11 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private String toJson(List<Map<String, String>> options) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < options.size(); i++) {
-            if (i > 0) sb.append(",");
-            Map<String, String> opt = options.get(i);
-            sb.append("{\"label\":\"").append(escapeJson(opt.get("label")))
-              .append("\",\"text\":\"").append(escapeJson(opt.get("text"))).append("\"}");
+        try {
+            return OBJECT_MAPPER.writeValueAsString(options);
+        } catch (Exception e) {
+            return "[]";
         }
-        sb.append("]");
-        return sb.toString();
-    }
-
-    private String escapeJson(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private void validateQuestion(Question q) {

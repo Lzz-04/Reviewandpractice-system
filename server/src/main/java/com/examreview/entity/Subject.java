@@ -16,5 +16,6 @@ public class Subject {
     private String description;
     private String icon;
     private Integer sortOrder;
+    private Long userId;
     private LocalDateTime createdAt;
 }

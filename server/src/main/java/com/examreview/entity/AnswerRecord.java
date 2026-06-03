@@ -19,4 +19,5 @@ public class AnswerRecord {
     private Integer isCorrect;
     private LocalDateTime answeredAt;
     private Integer timeSpent;
+    private Long userId;
 }

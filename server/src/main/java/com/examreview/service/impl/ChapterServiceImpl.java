@@ -9,6 +9,7 @@ import com.examreview.mapper.ChapterMapper;
 import com.examreview.mapper.QuestionMapper;
 import com.examreview.mapper.WrongQuestionMapper;
 import com.examreview.service.ChapterService;
+import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,33 +25,38 @@ public class ChapterServiceImpl implements ChapterService {
     private final WrongQuestionMapper wrongQuestionMapper;
 
     @Override
-    public List<Chapter> getBySubjectId(Integer subjectId) {
+    public List<Chapter> getBySubjectId(Integer subjectId, Long userId) {
         return chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>()
                         .eq(Chapter::getSubjectId, subjectId)
+                        .eq(!SecurityUtil.isAdmin(), Chapter::getUserId, userId)
                         .orderByAsc(Chapter::getSortOrder));
     }
 
     @Override
     @Transactional
-    public Chapter create(Chapter chapter) {
+    public Chapter create(Chapter chapter, Long userId) {
         if (chapter.getName() == null || chapter.getName().trim().isEmpty()) {
             throw new BusinessException("章节名称不能为空");
         }
-        // 自动分配 sort_order：当前科目下最大值 + 1
         List<Chapter> existing = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>()
                         .eq(Chapter::getSubjectId, chapter.getSubjectId())
+                        .eq(!SecurityUtil.isAdmin(), Chapter::getUserId, userId)
                         .orderByDesc(Chapter::getSortOrder)
                         .last("LIMIT 1"));
         chapter.setSortOrder(existing.isEmpty() ? 1 : existing.get(0).getSortOrder() + 1);
+        chapter.setUserId(userId);
         chapterMapper.insert(chapter);
         return chapter;
     }
 
     @Override
-    public Chapter update(Integer id, Chapter chapter) {
-        Chapter existing = chapterMapper.selectById(id);
+    public Chapter update(Integer id, Chapter chapter, Long userId) {
+        Chapter existing = chapterMapper.selectOne(
+                new LambdaQueryWrapper<Chapter>()
+                        .eq(Chapter::getId, id)
+                        .eq(!SecurityUtil.isAdmin(), Chapter::getUserId, userId));
         if (existing == null) {
             throw new BusinessException("章节不存在");
         }
@@ -60,18 +66,19 @@ public class ChapterServiceImpl implements ChapterService {
     }
 
     @Override
-    public void delete(Integer id) {
-        Chapter existing = chapterMapper.selectById(id);
+    public void delete(Integer id, Long userId) {
+        Chapter existing = chapterMapper.selectOne(
+                new LambdaQueryWrapper<Chapter>()
+                        .eq(Chapter::getId, id)
+                        .eq(!SecurityUtil.isAdmin(), Chapter::getUserId, userId));
         if (existing == null) {
             throw new BusinessException("章节不存在");
         }
-        // 检查该章节下是否有题目
         Long questionCount = questionMapper.selectCount(
                 new LambdaQueryWrapper<Question>().eq(Question::getChapterId, id));
         if (questionCount > 0) {
             throw new BusinessException("该章节下还有 " + questionCount + " 道题目，请先删除题目再删除章节");
         }
-        // 检查该章节下是否有错题记录
         Long wrongCount = wrongQuestionMapper.selectCount(
                 new LambdaQueryWrapper<WrongQuestion>().eq(WrongQuestion::getChapterId, id));
         if (wrongCount > 0) {

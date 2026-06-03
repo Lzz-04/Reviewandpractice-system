@@ -23,6 +23,8 @@ public class ExamRecord {
     private Integer durationRemaining;
     private String status;
     private String sessionId;
+    private Long userId;
+    private Integer currentIndex;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
     private LocalDateTime createdAt;

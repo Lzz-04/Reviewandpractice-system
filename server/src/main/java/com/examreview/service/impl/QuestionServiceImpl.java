@@ -12,6 +12,7 @@ import com.examreview.mapper.ExamQuestionMapper;
 import com.examreview.mapper.QuestionMapper;
 import com.examreview.mapper.WrongQuestionMapper;
 import com.examreview.service.QuestionService;
+import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +32,11 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Page<Question> getList(Integer page, Integer pageSize, Integer subjectId, Integer chapterId, String type,
-                                   String keyword, Integer difficulty, String sortBy) {
+                                   String keyword, Integer difficulty, String sortBy, Long userId) {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
         LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Question::getUserId, userId);
         if (subjectId != null) {
             wrapper.eq(Question::getSubjectId, subjectId);
         }
@@ -59,8 +61,11 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public Question getById(Integer id) {
-        Question question = questionMapper.selectById(id);
+    public Question getById(Integer id, Long userId) {
+        Question question = questionMapper.selectOne(
+                new LambdaQueryWrapper<Question>()
+                        .eq(Question::getId, id)
+                        .eq(!SecurityUtil.isAdmin(), Question::getUserId, userId));
         if (question == null) {
             throw new BusinessException("题目不存在");
         }
@@ -68,11 +73,12 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public Question create(Question question) {
+    public Question create(Question question, Long userId) {
         validateQuestion(question);
         if (question.getOptions() == null || question.getOptions().isEmpty()) {
             question.setOptions("[]");
         }
+        question.setUserId(userId);
         questionMapper.insert(question);
         return question;
     }
@@ -100,8 +106,8 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public Question update(Integer id, Question question) {
-        getById(id);
+    public Question update(Integer id, Question question, Long userId) {
+        getById(id, userId);
         question.setId(id);
         questionMapper.updateById(question);
         return questionMapper.selectById(id);
@@ -109,9 +115,8 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     @Transactional
-    public void delete(Integer id) {
-        getById(id); // 确保题目存在
-        // 依次删除关联记录，解除外键约束
+    public void delete(Integer id, Long userId) {
+        getById(id, userId);
         wrongQuestionMapper.delete(new LambdaQueryWrapper<WrongQuestion>().eq(WrongQuestion::getQuestionId, id));
         answerRecordMapper.delete(new LambdaQueryWrapper<AnswerRecord>().eq(AnswerRecord::getQuestionId, id));
         examQuestionMapper.delete(new LambdaQueryWrapper<ExamQuestion>().eq(ExamQuestion::getQuestionId, id));
@@ -120,24 +125,30 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     @Transactional
-    public void batchDelete(List<Integer> ids) {
+    public void batchDelete(List<Integer> ids, Long userId) {
         for (Integer id : ids) {
-            delete(id);
+            delete(id, userId);
         }
     }
 
     @Override
-    public List<Question> getRandomQuestions(Integer chapterId, Integer count) {
-        List<Question> all = questionMapper.selectByChapter(chapterId);
+    public List<Question> getRandomQuestions(Integer chapterId, Integer count, Long userId) {
+        List<Question> all = questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                        .eq(Question::getChapterId, chapterId)
+                        .eq(!SecurityUtil.isAdmin(), Question::getUserId, userId));
         Collections.shuffle(all);
         return all.subList(0, Math.min(count, all.size()));
     }
 
     @Override
-    public List<Question> getQuestionsByIds(List<Integer> ids) {
+    public List<Question> getQuestionsByIds(List<Integer> ids, Long userId) {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
         }
-        return questionMapper.selectBatchIds(ids);
+        return questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                        .in(Question::getId, ids)
+                        .eq(!SecurityUtil.isAdmin(), Question::getUserId, userId));
     }
 }

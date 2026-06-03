@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.examreview.dto.ApiResponse;
 import com.examreview.entity.Question;
 import com.examreview.service.QuestionService;
+import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,27 +29,27 @@ public class QuestionController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer difficulty,
             @RequestParam(required = false) String sortBy) {
-        return ApiResponse.ok(questionService.getList(page, pageSize, subjectId, chapterId, type, keyword, difficulty, sortBy));
+        return ApiResponse.ok(questionService.getList(page, pageSize, subjectId, chapterId, type, keyword, difficulty, sortBy, SecurityUtil.getCurrentUserId()));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<Question> getById(@PathVariable Integer id) {
-        return ApiResponse.ok(questionService.getById(id));
+        return ApiResponse.ok(questionService.getById(id, SecurityUtil.getCurrentUserId()));
     }
 
     @PostMapping
     public ApiResponse<Question> create(@RequestBody Question question) {
-        return ApiResponse.ok(questionService.create(question), "创建成功");
+        return ApiResponse.ok(questionService.create(question, SecurityUtil.getCurrentUserId()), "创建成功");
     }
 
     @PutMapping("/{id}")
     public ApiResponse<Question> update(@PathVariable Integer id, @RequestBody Question question) {
-        return ApiResponse.ok(questionService.update(id, question), "更新成功");
+        return ApiResponse.ok(questionService.update(id, question, SecurityUtil.getCurrentUserId()), "更新成功");
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Integer id) {
-        questionService.delete(id);
+        questionService.delete(id, SecurityUtil.getCurrentUserId());
         return ApiResponse.ok(null, "删除成功");
     }
 
@@ -57,12 +58,13 @@ public class QuestionController {
         if (ids == null || ids.isEmpty()) {
             return ApiResponse.fail("题目ID列表不能为空");
         }
-        questionService.batchDelete(ids);
+        questionService.batchDelete(ids, SecurityUtil.getCurrentUserId());
         return ApiResponse.ok(null, "批量删除成功");
     }
 
     @PutMapping("/batch")
     public ApiResponse<Void> batchUpdate(@RequestBody Map<String, Object> body) {
+        Long userId = SecurityUtil.getCurrentUserId();
         @SuppressWarnings("unchecked")
         List<Object> rawIds = (List<Object>) body.get("ids");
         if (rawIds == null || rawIds.isEmpty()) {
@@ -74,10 +76,10 @@ public class QuestionController {
         Integer chapterId = body.get("chapterId") != null ? ((Number) body.get("chapterId")).intValue() : null;
         Integer difficulty = body.get("difficulty") != null ? ((Number) body.get("difficulty")).intValue() : null;
         for (Integer id : ids) {
-            Question q = questionService.getById(id);
+            Question q = questionService.getById(id, userId);
             if (chapterId != null) q.setChapterId(chapterId);
             if (difficulty != null) q.setDifficulty(difficulty);
-            questionService.update(id, q);
+            questionService.update(id, q, userId);
         }
         return ApiResponse.ok(null, "批量更新成功");
     }
@@ -86,6 +88,6 @@ public class QuestionController {
     public ApiResponse<?> getRandom(
             @RequestParam Integer chapterId,
             @RequestParam(defaultValue = "10") Integer count) {
-        return ApiResponse.ok(questionService.getRandomQuestions(chapterId, count));
+        return ApiResponse.ok(questionService.getRandomQuestions(chapterId, count, SecurityUtil.getCurrentUserId()));
     }
 }

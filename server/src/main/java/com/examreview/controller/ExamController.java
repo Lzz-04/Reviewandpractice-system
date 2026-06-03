@@ -5,12 +5,12 @@ import com.examreview.dto.*;
 import com.examreview.entity.ExamPaper;
 import com.examreview.entity.ExamRecord;
 import com.examreview.service.ExamService;
+import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 import com.examreview.entity.Question;
 
@@ -26,65 +26,72 @@ public class ExamController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize,
             @RequestParam(required = false) Integer subjectId) {
-        return ApiResponse.ok(examService.getList(page, pageSize, subjectId));
+        return ApiResponse.ok(examService.getList(page, pageSize, subjectId, SecurityUtil.getCurrentUserId()));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<ExamPaper> getById(@PathVariable Integer id) {
-        return ApiResponse.ok(examService.getById(id));
+        return ApiResponse.ok(examService.getById(id, SecurityUtil.getCurrentUserId()));
     }
 
     @PostMapping
     public ApiResponse<ExamPaper> create(@RequestBody ExamPaper examPaper) {
-        return ApiResponse.ok(examService.create(examPaper), "创建成功");
+        return ApiResponse.ok(examService.create(examPaper, SecurityUtil.getCurrentUserId()), "创建成功");
     }
 
     @PostMapping("/generate")
     public ApiResponse<ExamPaper> generate(@RequestBody @Valid ExamGenerateDTO dto) {
-        return ApiResponse.ok(examService.generate(dto), "组卷成功");
+        return ApiResponse.ok(examService.generate(dto, SecurityUtil.getCurrentUserId()), "组卷成功");
     }
 
     @PostMapping("/{id}/start")
     public ApiResponse<ExamRecord> startExam(@PathVariable Integer id) {
-        return ApiResponse.ok(examService.startExam(id));
+        return ApiResponse.ok(examService.startExam(id, SecurityUtil.getCurrentUserId()));
     }
 
     @PostMapping("/submit")
     public ApiResponse<ExamResultDTO> submitExam(@RequestBody @Valid ExamSubmitDTO dto) {
-        return ApiResponse.ok(examService.submitExam(dto), "交卷成功");
+        return ApiResponse.ok(examService.submitExam(dto, SecurityUtil.getCurrentUserId()), "交卷成功");
     }
 
     @GetMapping("/records")
     public ApiResponse<Page<ExamRecord>> getRecords(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize) {
-        return ApiResponse.ok(examService.getRecords(page, pageSize));
+        return ApiResponse.ok(examService.getRecords(page, pageSize, SecurityUtil.getCurrentUserId()));
+    }
+
+    /** 获取当前用户活跃的考试记录（进行中 + 已暂停） */
+    @GetMapping("/records-active")
+    public ApiResponse<List<ExamRecord>> getActiveRecords() {
+        return ApiResponse.ok(examService.getActiveRecords(SecurityUtil.getCurrentUserId()));
     }
 
     @PostMapping("/records/{id}/pause")
-    public ApiResponse<Void> pauseExam(@PathVariable Integer id, @RequestBody Map<String, Integer> body) {
-        examService.pauseExam(id, body.getOrDefault("remainingSeconds", 0));
+    public ApiResponse<Void> pauseExam(@PathVariable Integer id,
+                                        @RequestBody PauseExamDTO dto) {
+        examService.pauseExam(id, dto, SecurityUtil.getCurrentUserId());
         return ApiResponse.ok(null, "已暂停");
     }
 
     @PostMapping("/records/{id}/resume")
-    public ApiResponse<ExamRecord> resumeExam(@PathVariable Integer id) {
-        return ApiResponse.ok(examService.resumeExam(id));
+    public ApiResponse<ResumeExamResponse> resumeExam(@PathVariable Integer id) {
+        return ApiResponse.ok(examService.resumeExam(id, SecurityUtil.getCurrentUserId()));
     }
 
     @GetMapping("/records/{id}")
     public ApiResponse<ExamResultDTO> getRecordDetail(@PathVariable Integer id) {
-        return ApiResponse.ok(examService.getRecordDetail(id));
+        return ApiResponse.ok(examService.getRecordDetail(id, SecurityUtil.getCurrentUserId()));
     }
 
     @GetMapping("/{id}/questions")
     public ApiResponse<List<Question>> getExamQuestions(@PathVariable Integer id) {
-        return ApiResponse.ok(examService.getExamQuestions(id));
+        return ApiResponse.ok(examService.getExamQuestions(id, SecurityUtil.getCurrentUserId()));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteExam(@PathVariable Integer id) {
-        examService.deleteExam(id);
+        examService.deleteExam(id, SecurityUtil.getCurrentUserId());
         return ApiResponse.ok(null, "删除成功");
     }
 }

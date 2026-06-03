@@ -8,6 +8,7 @@ import com.examreview.exception.BusinessException;
 import com.examreview.mapper.QuestionMapper;
 import com.examreview.mapper.WrongQuestionMapper;
 import com.examreview.service.WrongBookService;
+import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,11 +26,12 @@ public class WrongBookServiceImpl implements WrongBookService {
 
     @Override
     public com.baomidou.mybatisplus.extension.plugins.pagination.Page<WrongQuestionDTO> getList(
-            Integer page, Integer pageSize, Integer subjectId, Integer mastered) {
+            Integer page, Integer pageSize, Integer subjectId, Integer mastered, Long userId) {
         if (page == null || page < 1) page = 1;
         if (pageSize == null || pageSize < 1) pageSize = 20;
 
         LambdaQueryWrapper<WrongQuestion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(!SecurityUtil.isAdmin(), WrongQuestion::getUserId, userId);
         if (subjectId != null) {
             wrapper.eq(WrongQuestion::getSubjectId, subjectId);
         }
@@ -85,46 +87,59 @@ public class WrongBookServiceImpl implements WrongBookService {
     }
 
     @Override
-    public Map<String, Object> getStats() {
-        long total = wrongQuestionMapper.selectCount(null);
+    public Map<String, Object> getStats(Long userId) {
+        long total = wrongQuestionMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestion>().eq(!SecurityUtil.isAdmin(), WrongQuestion::getUserId, userId));
         long masteredCount = wrongQuestionMapper.selectCount(
-                new LambdaQueryWrapper<WrongQuestion>().eq(WrongQuestion::getMastered, 1));
+                new LambdaQueryWrapper<WrongQuestion>()
+                        .eq(!SecurityUtil.isAdmin(), WrongQuestion::getUserId, userId)
+                        .eq(WrongQuestion::getMastered, 1));
         return Map.of("total", total, "mastered", masteredCount, "unMastered", total - masteredCount);
     }
 
     @Override
-    public void review(Integer id) {
+    public void review(Integer id, Long userId) {
         WrongQuestion wq = wrongQuestionMapper.selectById(id);
         if (wq == null) {
             throw new BusinessException("错题记录不存在");
+        }
+        if (!SecurityUtil.isAdmin() && !wq.getUserId().equals(userId)) {
+            throw new BusinessException("无权操作此错题记录");
         }
         wq.setReviewedCount(wq.getReviewedCount() + 1);
         wrongQuestionMapper.updateById(wq);
     }
 
     @Override
-    public void master(Integer id) {
+    public void master(Integer id, Long userId) {
         WrongQuestion wq = wrongQuestionMapper.selectById(id);
         if (wq == null) {
             throw new BusinessException("错题记录不存在");
+        }
+        if (!SecurityUtil.isAdmin() && !wq.getUserId().equals(userId)) {
+            throw new BusinessException("无权操作此错题记录");
         }
         wq.setMastered(wq.getMastered() == 1 ? 0 : 1);
         wrongQuestionMapper.updateById(wq);
     }
 
     @Override
-    public void remove(Integer id) {
+    public void remove(Integer id, Long userId) {
         WrongQuestion wq = wrongQuestionMapper.selectById(id);
         if (wq == null) {
             throw new BusinessException("错题记录不存在");
+        }
+        if (!SecurityUtil.isAdmin() && !wq.getUserId().equals(userId)) {
+            throw new BusinessException("无权操作此错题记录");
         }
         wrongQuestionMapper.deleteById(id);
     }
 
     @Override
-    public void upsertWrongQuestion(Question question) {
+    public void upsertWrongQuestion(Question question, Long userId) {
         WrongQuestion existing = wrongQuestionMapper.selectOne(
                 new LambdaQueryWrapper<WrongQuestion>()
+                        .eq(!SecurityUtil.isAdmin(), WrongQuestion::getUserId, userId)
                         .eq(WrongQuestion::getQuestionId, question.getId()));
 
         if (existing != null) {
@@ -137,6 +152,7 @@ public class WrongBookServiceImpl implements WrongBookService {
             wq.setSubjectId(question.getSubjectId());
             wq.setChapterId(question.getChapterId());
             wq.setWrongCount(1);
+            wq.setUserId(userId);
             wq.setLastWrongAt(java.time.LocalDateTime.now());
             wq.setReviewedCount(0);
             wq.setMastered(0);

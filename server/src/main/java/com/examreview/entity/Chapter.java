@@ -15,5 +15,6 @@ public class Chapter {
     private Integer subjectId;
     private String name;
     private Integer sortOrder;
+    private Long userId;
     private LocalDateTime createdAt;
 }

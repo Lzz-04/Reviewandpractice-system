@@ -28,8 +28,48 @@ public class ImportServiceImpl implements ImportService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
+    public String previewExtract(MultipartFile file) throws IOException {
+        String filename = file.getOriginalFilename();
+        if (filename == null) {
+            throw new IllegalArgumentException("文件名不能为空");
+        }
+        String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+        List<Question> questions = switch (ext) {
+            case "xlsx" -> parseXlsx(file, null, null);
+            case "docx" -> parseDocx(file, null, null);
+            case "pdf" -> parsePdf(file, null, null);
+            case "txt" -> parseTxt(file, null, null);
+            default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、pdf、xlsx、txt");
+        };
+
+        List<Question> singles = questions.stream()
+            .filter(q -> "single".equals(q.getType()))
+            .limit(10)
+            .toList();
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < singles.size(); i++) {
+            Question q = singles.get(i);
+            sb.append("题型：单选\n");
+            sb.append("题目：").append(q.getContent()).append("\n");
+            try {
+                @SuppressWarnings("unchecked")
+                List<Map<String, String>> opts = OBJECT_MAPPER.readValue(q.getOptions(), List.class);
+                for (Map<String, String> opt : opts) {
+                    sb.append(opt.get("label")).append(".").append(opt.get("text")).append("\n");
+                }
+            } catch (Exception ignored) {}
+            sb.append("答案：").append(q.getAnswer());
+            if (i < singles.size() - 1) {
+                sb.append("\n\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    @Override
     @Transactional
-    public ImportResultDTO importQuestions(MultipartFile file, Integer subjectId, Integer chapterId) throws IOException {
+    public ImportResultDTO importQuestions(MultipartFile file, Integer subjectId, Integer chapterId, Long userId) throws IOException {
         String filename = file.getOriginalFilename();
         if (filename == null) {
             throw new IllegalArgumentException("文件名不能为空");
@@ -50,6 +90,7 @@ public class ImportServiceImpl implements ImportService {
         for (Question q : questions) {
             try {
                 validateQuestion(q);
+                q.setUserId(userId);
                 questionMapper.insert(q);
                 result.setSuccess(result.getSuccess() + 1);
             } catch (Exception e) {
@@ -156,24 +197,28 @@ public class ImportServiceImpl implements ImportService {
     private List<Question> parseExamPaper(String text, Integer subjectId, Integer chapterId) {
         text = text.replace("\r\n", "\n").replace("\r", "\n");
 
-        // 1. 找所有题号位置: 数字.空格 (题目编号后有空格，而答案 1.B 无空格)
-        Pattern qNum = Pattern.compile("(?<=^|[^A-Za-z\\d])(\\d+)[.、．]\\s");
-        Matcher qm = qNum.matcher(text);
-        java.util.List<Integer> starts = new java.util.ArrayList<>();
-        while (qm.find()) starts.add(qm.start());
-        if (starts.isEmpty()) return java.util.Collections.emptyList();
-
-        // 2. 找答案区边界：题目编号结束后，编号重新从1开始的 \b1\s*[.、．]\s*[A-F] 位置
+        // 1. 先定位答案区边界：编号重置为1且紧跟单个答案字母的短行
         int answerStart = text.length();
         Pattern ansRestart = Pattern.compile("\\b1\\s*[.、．]\\s*[A-FT√×对错]");
         Matcher arm = ansRestart.matcher(text);
-        int lastQStart = starts.get(starts.size() - 1);
         while (arm.find()) {
-            if (arm.start() > lastQStart) {
+            int after = arm.end();
+            int nl = text.indexOf('\n', after);
+            String rest = (nl == -1) ? text.substring(after).trim() : text.substring(after, nl).trim();
+            if (rest.length() <= 4) {
                 answerStart = arm.start();
                 break;
             }
         }
+
+        // 2. 找题目区所有题号位置（只取答案区之前的）
+        Pattern qNum = Pattern.compile("(?<=^|[^A-Za-z\\d])(\\d+)[.、．]\\s");
+        Matcher qm = qNum.matcher(text);
+        java.util.List<Integer> starts = new java.util.ArrayList<>();
+        while (qm.find()) {
+            if (qm.start() < answerStart) starts.add(qm.start());
+        }
+        if (starts.isEmpty()) return java.util.Collections.emptyList();
 
         // 3. 解析答案区
         Map<Integer, String> answerMap = new LinkedHashMap<>();
@@ -187,12 +232,11 @@ public class ImportServiceImpl implements ImportService {
             }
         }
 
-        // 4. 解析题目区（到答案区边界为止）
+        // 4. 解析题目区
         List<Question> list = new java.util.ArrayList<>();
-        for (int i = 0; i < starts.size() && starts.get(i) < answerStart; i++) {
+        for (int i = 0; i < starts.size(); i++) {
             int s = starts.get(i);
-            int e = (i + 1 < starts.size() && starts.get(i + 1) <= answerStart)
-                ? starts.get(i + 1) : answerStart;
+            int e = (i + 1 < starts.size()) ? starts.get(i + 1) : answerStart;
             String block = text.substring(s, e).trim();
             if (block.isEmpty()) continue;
             Question q = parseExamQuestion(block, answerMap);

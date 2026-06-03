@@ -16,5 +16,6 @@ public class ExamPaper {
     private String title;
     private Integer duration;
     private Integer questionCount;
+    private Long userId;
     private LocalDateTime createdAt;
 }

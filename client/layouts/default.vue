@@ -30,14 +30,36 @@
           <span class="nav-icon"><WarningFilled /></span>
           <span class="nav-label">错题本</span>
         </NuxtLink>
-        <NuxtLink to="/stats" class="nav-item" :class="{ active: route.path === '/stats' }">
-          <span class="nav-icon"><DataAnalysis /></span>
-          <span class="nav-label">学习统计</span>
+        <NuxtLink v-if="authStore.user?.role === 'admin'" to="/admin" class="nav-item" :class="{ active: route.path === '/admin' }">
+          <span class="nav-icon"><Setting /></span>
+          <span class="nav-label">管理后台</span>
         </NuxtLink>
       </nav>
 
+      <!-- 用户信息区域 -->
       <div class="sidebar-footer">
-        <div class="footer-tip">
+        <div class="user-info" v-if="authStore.isAuthenticated && authStore.user">
+          <div class="user-avatar">
+            <el-avatar :size="36" :icon="UserFilled" />
+          </div>
+          <div class="user-detail">
+            <span class="user-name">{{ authStore.user.nickname || authStore.user.username }}</span>
+            <span class="user-role">学生</span>
+          </div>
+          <el-popconfirm
+            title="确定要退出登录吗？"
+            confirm-button-text="确定"
+            cancel-button-text="取消"
+            @confirm="handleLogout"
+          >
+            <template #reference>
+              <button class="logout-btn" title="退出登录">
+                <el-icon><SwitchButton /></el-icon>
+              </button>
+            </template>
+          </el-popconfirm>
+        </div>
+        <div class="footer-tip" v-else>
           <span class="tip-dot"></span>
           专注学习，每天进步
         </div>
@@ -52,6 +74,9 @@
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-current">{{ pageTitle }}</span>
         </div>
+        <div class="topbar-right" v-if="authStore.isAuthenticated && authStore.user">
+          <span class="greeting-text">👋 你好，{{ authStore.user.nickname || authStore.user.username }}</span>
+        </div>
       </header>
       <main class="main-content">
         <slot />
@@ -62,17 +87,25 @@
 
 <script setup>
 import {
-  HomeFilled, Collection, Tickets, WarningFilled, DataAnalysis,
+  HomeFilled, Collection, Tickets, WarningFilled, SwitchButton, UserFilled, Setting,
 } from '@element-plus/icons-vue'
 
+const authStore = useAuthStore()
+const router = useRouter()
 const route = useRoute()
+
+// 初始化 auth store（从 localStorage 恢复登录状态）
+if (process.client) {
+  authStore.init()
+}
+
 const pageTitle = computed(() => {
   const map = {
     '/': '仪表盘',
     '/subjects': '科目管理',
     '/exam': '模拟考试',
     '/wrongbook': '错题本',
-    '/stats': '学习统计',
+    '/admin': '管理后台',
   }
   if (route.path.startsWith('/subject/')) return '科目详情'
   if (route.path.startsWith('/practice/')) return '刷题练习'
@@ -80,6 +113,11 @@ const pageTitle = computed(() => {
   if (route.path.startsWith('/exam/result/')) return '考试结果'
   return map[route.path] || ''
 })
+
+const handleLogout = () => {
+  authStore.logout()
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -185,10 +223,68 @@ const pageTitle = computed(() => {
   white-space: nowrap;
 }
 
-/* Footer */
+/* Footer - 用户信息 */
 .sidebar-footer {
-  padding: 16px 20px;
+  padding: 14px 16px;
   border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  flex-shrink: 0;
+}
+
+.user-avatar :deep(.el-avatar) {
+  background: linear-gradient(135deg, #3b5dbf, #5876d8);
+  font-size: 16px;
+}
+
+.user-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.user-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #d8dde8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role {
+  font-size: 11px;
+  color: #5a6380;
+}
+
+.logout-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  border-radius: 6px;
+  color: #6b7390;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
 }
 
 .footer-tip {
@@ -229,6 +325,7 @@ const pageTitle = computed(() => {
   border-bottom: 1px solid var(--c-border, #e7e5e0);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 28px;
   box-shadow: 0 1px 2px rgba(22,27,43,0.03);
   z-index: 5;
@@ -255,6 +352,16 @@ const pageTitle = computed(() => {
 .breadcrumb-current {
   color: var(--c-text, #1e293b);
   font-weight: 600;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.greeting-text {
+  font-size: 13px;
+  color: #94a3b8;
 }
 
 .main-content {

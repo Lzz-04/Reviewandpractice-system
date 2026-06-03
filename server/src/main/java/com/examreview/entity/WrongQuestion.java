@@ -19,5 +19,6 @@ public class WrongQuestion {
     private LocalDateTime lastWrongAt;
     private Integer reviewedCount;
     private Integer mastered;
+    private Long userId;
     private LocalDateTime createdAt;
 }

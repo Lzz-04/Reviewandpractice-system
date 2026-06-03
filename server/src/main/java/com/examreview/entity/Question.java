@@ -20,5 +20,6 @@ public class Question {
     private String answer;
     private String analysis;
     private Integer difficulty;
+    private Long userId;
     private LocalDateTime createdAt;
 }

@@ -18,7 +18,15 @@ target/
 .vscode/
 .env
 .env.local
+.env.*.local
 *.log
 *.ctxt
 .mtj.tmp/
 hs_err_pid*
+
+# 本地配置文件（含密钥，不可提交）
+server/src/main/resources/application.yml
+
+# OS 文件
+Thumbs.db
+.DS_Store

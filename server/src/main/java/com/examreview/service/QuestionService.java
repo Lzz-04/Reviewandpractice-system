@@ -6,12 +6,12 @@ import java.util.List;
 
 public interface QuestionService {
     Page<Question> getList(Integer page, Integer pageSize, Integer subjectId, Integer chapterId, String type,
-                         String keyword, Integer difficulty, String sortBy);
-    Question getById(Integer id);
-    Question create(Question question);
-    Question update(Integer id, Question question);
-    void delete(Integer id);
-    void batchDelete(List<Integer> ids);
-    List<Question> getRandomQuestions(Integer chapterId, Integer count);
-    List<Question> getQuestionsByIds(List<Integer> ids);
+                         String keyword, Integer difficulty, String sortBy, Long userId);
+    Question getById(Integer id, Long userId);
+    Question create(Question question, Long userId);
+    Question update(Integer id, Question question, Long userId);
+    void delete(Integer id, Long userId);
+    void batchDelete(List<Integer> ids, Long userId);
+    List<Question> getRandomQuestions(Integer chapterId, Integer count, Long userId);
+    List<Question> getQuestionsByIds(List<Integer> ids, Long userId);
 }

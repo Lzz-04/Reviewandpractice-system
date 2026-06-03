@@ -1,19 +1,23 @@
 -- 种子数据：插入示例科目、章节和题目
+
+-- 默认管理员用户（密码 123456 的 BCrypt 加密值由应用启动时自动创建，此处仅作占位）
+-- INSERT IGNORE INTO users (username, password, nickname) VALUES ('admin', '<bcrypt-hash>', '管理员');
+
 -- 科目
-INSERT IGNORE INTO subjects (id, name, description, icon, sort_order) VALUES
-(1, '高等数学', '高等数学（上册）期末复习', '📐', 1),
-(2, '大学英语', '大学英语四级核心词汇与语法', '📖', 2),
-(3, '数据结构', '数据结构与算法基础', '💻', 3);
+INSERT IGNORE INTO subjects (id, name, description, icon, sort_order, user_id) VALUES
+(1, '高等数学', '高等数学（上册）期末复习', '📐', 1, 1),
+(2, '大学英语', '大学英语四级核心词汇与语法', '📖', 2, 1),
+(3, '数据结构', '数据结构与算法基础', '💻', 3, 1);
 
 -- 章节
-INSERT IGNORE INTO chapters (id, subject_id, name, sort_order) VALUES
-(1, 1, '第一章 函数与极限', 1),
-(2, 1, '第二章 导数与微分', 2),
-(3, 1, '第三章 不定积分', 3),
-(4, 2, '核心词汇', 1),
-(5, 2, '语法专项', 2),
-(6, 3, '线性表', 1),
-(7, 3, '树与二叉树', 2);
+INSERT IGNORE INTO chapters (id, subject_id, name, sort_order, user_id) VALUES
+(1, 1, '第一章 函数与极限', 1, 1),
+(2, 1, '第二章 导数与微分', 2, 1),
+(3, 1, '第三章 不定积分', 3, 1),
+(4, 2, '核心词汇', 1, 1),
+(5, 2, '语法专项', 2, 1),
+(6, 3, '线性表', 1, 1),
+(7, 3, '树与二叉树', 2, 1);
 
 -- 题目示例 — 高等数学
 INSERT IGNORE INTO questions (id, chapter_id, subject_id, type, content, options, answer, analysis, difficulty) VALUES
@@ -344,3 +348,9 @@ INSERT IGNORE INTO questions (id, chapter_id, subject_id, type, content, options
   {"label":"C","text":"n = 2n₂ + n₁ + 1"},
   {"label":"D","text":"n₀ = n₁ + 1"}
 ]', 'A,B,C', '二叉树性质：n₀ = n₂ + 1；n = n₀ + n₁ + n₂；代入得 n = 2n₂ + n₁ + 1；D选项错误', 2);
+
+-- 将已有种子数据的 user_id 设为 1（管理员账号），确保迁移后旧数据可见
+UPDATE subjects SET user_id = 1 WHERE user_id = 0;
+UPDATE chapters SET user_id = 1 WHERE user_id = 0;
+UPDATE questions SET user_id = 1 WHERE user_id = 0;
+UPDATE exam_papers SET user_id = 1 WHERE user_id = 0;

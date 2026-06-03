@@ -5,6 +5,35 @@
       <p>创建和管理模拟考试，检验学习成果</p>
     </div>
 
+    <!-- 我的考试（活跃记录） -->
+    <div class="my-exams-panel" v-if="activeRecords.length > 0">
+      <div class="panel-header">
+        <el-icon><Clock /></el-icon>
+        <span>我的考试</span>
+      </div>
+      <div class="my-exams-list">
+        <div v-for="r in activeRecords" :key="r.id" class="my-exam-card" :class="'status-' + r.status">
+          <div class="me-left">
+            <div class="me-badge" :class="r.status">
+              {{ r.status === 'paused' ? '已暂停' : '进行中' }}
+            </div>
+            <div class="me-info">
+              <span class="me-exam">试卷 #{{ r.examId }}</span>
+              <span class="me-meta">
+                {{ r.totalQuestions }} 题 · {{ r.correctCount || 0 }} 已答
+                <template v-if="r.durationUsed"> · 已用 {{ formatDuration(r.durationUsed) }}</template>
+              </span>
+            </div>
+          </div>
+          <div class="me-actions">
+            <el-button type="primary" size="small" @click="continueExam(r)">
+              {{ r.status === 'paused' ? '继续考试' : '进入考试' }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 快速组卷 -->
     <div class="gen-panel">
       <div class="gen-header">
@@ -61,16 +90,29 @@
 
 <script setup>
 import { ElMessage } from 'element-plus'
-import { Tickets } from '@element-plus/icons-vue'
+import { Tickets, Clock } from '@element-plus/icons-vue'
 
 const api = useApi()
 const examStore = useExamStore()
 const subjects = ref([])
 const exams = ref([])
+const activeRecords = ref([])
 const loading = ref(false)
 const genForm = ref({ subjectId: null, title: '', duration: 30, totalCount: 20 })
 
+function formatDuration(seconds) {
+  if (!seconds) return '0分'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}分${s}秒`
+}
+
 async function loadSubjects() { subjects.value = await api.get('/subjects').catch(() => []) }
+async function loadActiveRecords() {
+  try {
+    activeRecords.value = await api.get('/exams/records-active').catch(() => [])
+  } catch { activeRecords.value = [] }
+}
 async function loadExams() {
   loading.value = true
   try {
@@ -98,12 +140,79 @@ async function startExam(row) {
   navigateTo(`/exam/start/${row.id}`)
 }
 
+async function continueExam(record) {
+  navigateTo(`/exam/start/${record.examId}`)
+}
+
 async function handleDelete(id) { await api.delete(`/exams/${id}`); await loadExams() }
 
-onMounted(async () => { await Promise.all([loadSubjects(), loadExams()]) })
+onMounted(async () => { await Promise.all([loadSubjects(), loadExams(), loadActiveRecords()]) })
 </script>
 
 <style scoped>
+/* My Exams Panel */
+.my-exams-panel {
+  background: #fff;
+  border: 1px solid #e8e5df;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(22,27,43,0.04);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0ede7;
+  font-weight: 650;
+  font-size: 15px;
+  color: #e0781a;
+}
+.my-exams-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: #f0ede7;
+}
+.my-exam-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fff;
+  transition: background 0.15s;
+}
+.my-exam-card:hover { background: #fafaf8; }
+.me-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.me-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.me-badge.paused { background: #fffbeb; color: #d97706; }
+.me-badge.in_progress { background: #ecfdf5; color: #15803d; }
+.me-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.me-exam {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.me-meta {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 /* Generate Panel */
 .gen-panel {
   background: #fff;

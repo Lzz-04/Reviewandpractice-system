@@ -173,15 +173,25 @@ onMounted(async () => {
 
 async function handleResume() {
   try {
-    const record = await api.post(`/exams/records/${pausedRecordId.value}/resume`)
+    const res = await api.post(`/exams/records/${pausedRecordId.value}/resume`)
+    const record = res.record
     examStore.recordId = record.id
     examStore.started = true
+    // 恢复计时
     timerRemaining.value = record.durationRemaining || timerDuration.value * 60
     timerFormatTime.value = `${String(Math.floor(timerRemaining.value / 60)).padStart(2, '0')}:${String(timerRemaining.value % 60).padStart(2, '0')}`
+    // 加载试卷和题目
     const paper = await api.get(`/exams/${route.params.examId}`)
     timerDuration.value = paper.duration
     const questions = await api.get(`/exams/${route.params.examId}/questions`)
     examStore.setQuestions(questions, paper.duration)
+    // 恢复答题进度
+    if (res.savedAnswers) {
+      examStore.answers = res.savedAnswers
+    }
+    if (record.currentIndex != null) {
+      examStore.currentIndex = record.currentIndex
+    }
     showResume.value = false
     startTimer()
   } catch {}
@@ -206,7 +216,11 @@ async function handlePause() {
   pausing.value = true
   clearInterval(timerInterval)
   try {
-    await api.post(`/exams/records/${examStore.recordId}/pause`, { remainingSeconds: timerRemaining.value })
+    await api.post(`/exams/records/${examStore.recordId}/pause`, {
+      remainingSeconds: timerRemaining.value,
+      answers: examStore.answers,
+      currentIndex: examStore.currentIndex,
+    })
     ElMessage.success('考试已暂停，可稍后继续')
     examStore.reset()
     navigateTo('/exam')

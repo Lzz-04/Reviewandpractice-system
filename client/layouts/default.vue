@@ -30,6 +30,10 @@
           <span class="nav-icon"><WarningFilled /></span>
           <span class="nav-label">错题本</span>
         </NuxtLink>
+        <NuxtLink to="/stats" class="nav-item" :class="{ active: route.path === '/stats' }">
+          <span class="nav-icon"><DataAnalysis /></span>
+          <span class="nav-label">学习统计</span>
+        </NuxtLink>
         <NuxtLink v-if="authStore.user?.role === 'admin'" to="/admin" class="nav-item" :class="{ active: route.path === '/admin' }">
           <span class="nav-icon"><Setting /></span>
           <span class="nav-label">管理后台</span>
@@ -46,6 +50,9 @@
             <span class="user-name">{{ authStore.user.nickname || authStore.user.username }}</span>
             <span class="user-role">学生</span>
           </div>
+          <button class="logout-btn" title="修改密码" @click="showPwdDialog = true">
+            <el-icon><Lock /></el-icon>
+          </button>
           <el-popconfirm
             title="确定要退出登录吗？"
             confirm-button-text="确定"
@@ -82,12 +89,31 @@
         <slot />
       </main>
     </div>
+
+    <!-- 修改密码弹窗 -->
+    <el-dialog v-model="showPwdDialog" title="修改密码" width="400px">
+      <el-form :model="pwdForm" :rules="pwdRules" ref="pwdFormRef" label-width="80px">
+        <el-form-item label="原密码" prop="oldPassword">
+          <el-input v-model="pwdForm.oldPassword" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="pwdForm.newPassword" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="pwdForm.confirmPassword" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showPwdDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleChangePwd" :loading="pwdLoading">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import {
-  HomeFilled, Collection, Tickets, WarningFilled, SwitchButton, UserFilled, Setting,
+  HomeFilled, Collection, Tickets, WarningFilled, DataAnalysis, SwitchButton, UserFilled, Setting, Lock,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
@@ -105,6 +131,7 @@ const pageTitle = computed(() => {
     '/subjects': '科目管理',
     '/exam': '模拟考试',
     '/wrongbook': '错题本',
+    '/stats': '学习统计',
     '/admin': '管理后台',
   }
   if (route.path.startsWith('/subject/')) return '科目详情'
@@ -113,6 +140,30 @@ const pageTitle = computed(() => {
   if (route.path.startsWith('/exam/result/')) return '考试结果'
   return map[route.path] || ''
 })
+
+const showPwdDialog = ref(false)
+const pwdLoading = ref(false)
+const pwdFormRef = ref(null)
+const pwdForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const pwdRules = {
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  newPassword: [{ required: true, min: 6, message: '密码至少6位', trigger: 'blur' }],
+  confirmPassword: [{ required: true, validator: (r, v, cb) => v !== pwdForm.newPassword ? cb('两次密码不一致') : cb(), trigger: 'blur' }],
+}
+
+async function handleChangePwd() {
+  const valid = await pwdFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  pwdLoading.value = true
+  try {
+    const api = useApi()
+    await api.put('/auth/password', { oldPassword: pwdForm.oldPassword, newPassword: pwdForm.newPassword })
+    showPwdDialog.value = false
+    authStore.logout()
+    ElMessage.success('密码修改成功，请重新登录')
+    router.push('/login')
+  } catch {} finally { pwdLoading.value = false }
+}
 
 const handleLogout = () => {
   authStore.logout()

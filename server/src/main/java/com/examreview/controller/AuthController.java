@@ -1,6 +1,7 @@
 package com.examreview.controller;
 
 import com.examreview.dto.ApiResponse;
+import com.examreview.dto.ChangePasswordDTO;
 import com.examreview.dto.LoginRequest;
 import com.examreview.dto.LoginResponse;
 import com.examreview.dto.RegisterRequest;
@@ -43,5 +44,13 @@ public class AuthController {
     public ApiResponse<LoginResponse> me(@AuthenticationPrincipal UserPrincipal principal) {
         LoginResponse response = authService.getCurrentUser(principal.getId());
         return ApiResponse.ok(response);
+    }
+
+    /** 修改密码 */
+    @PutMapping("/password")
+    public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto,
+                                             @AuthenticationPrincipal UserPrincipal principal) {
+        authService.changePassword(principal.getId(), dto);
+        return ApiResponse.ok(null, "密码修改成功");
     }
 }

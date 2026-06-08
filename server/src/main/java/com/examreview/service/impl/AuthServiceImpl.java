@@ -1,6 +1,7 @@
 package com.examreview.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.examreview.dto.ChangePasswordDTO;
 import com.examreview.dto.LoginRequest;
 import com.examreview.dto.LoginResponse;
 import com.examreview.dto.RegisterRequest;
@@ -80,6 +81,17 @@ public class AuthServiceImpl implements AuthService {
         }
         return new LoginResponse(null, user.getId(), user.getUsername(), user.getNickname(),
                 user.getRole() != null ? user.getRole() : "user");
+    }
+
+    @Override
+    public void changePassword(Long userId, ChangePasswordDTO dto) {
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException("用户不存在");
+        if (!passwordEncoder.matches(dto.getOldPassword(), user.getPassword())) {
+            throw new BusinessException("原密码错误");
+        }
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        userMapper.updateById(user);
     }
 
     private String getUserNickname(Long userId) {

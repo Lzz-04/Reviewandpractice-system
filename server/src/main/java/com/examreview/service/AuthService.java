@@ -1,5 +1,6 @@
 package com.examreview.service;
 
+import com.examreview.dto.ChangePasswordDTO;
 import com.examreview.dto.LoginRequest;
 import com.examreview.dto.LoginResponse;
 import com.examreview.dto.RegisterRequest;
@@ -20,4 +21,5 @@ public interface AuthService {
      * 获取当前登录用户信息
      */
     LoginResponse getCurrentUser(Long userId);
+    void changePassword(Long userId, ChangePasswordDTO dto);
 }

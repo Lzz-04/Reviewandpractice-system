@@ -130,7 +130,12 @@
               <el-button size="small" type="danger">移出</el-button>
             </template>
           </el-popconfirm>
+          <el-button size="small" type="warning" @click="handleAIAnalysis(item)" :loading="aiLoadingId === item.id">
+            🤖 AI解析
+          </el-button>
         </div>
+        <!-- AI 返回内容 -->
+        <div v-if="aiResults[item.id]" class="ai-result-card">{{ aiResults[item.id] }}</div>
       </div>
 
       <el-empty v-if="!loading && list.length === 0" description="暂无错题，继续加油！" :image-size="80" />
@@ -192,6 +197,18 @@ async function handleReview(item) {
 async function handleMaster(item) {
   await api.post(`/wrongbook/${item.id}/master`)
   await Promise.all([loadList(), loadStats()])
+}
+
+const aiLoadingId = ref(null)
+const aiResults = ref({})
+
+async function handleAIAnalysis(item) {
+  aiLoadingId.value = item.id
+  try {
+    const result = await api.get(`/wrongbook/${item.id}/ai-analysis`)
+    aiResults.value = { ...aiResults.value, [item.id]: result }
+    ElMessage.success('AI 解析完成')
+  } catch {} finally { aiLoadingId.value = null }
 }
 
 async function handleRemove(id) {
@@ -434,4 +451,5 @@ onMounted(async () => {
   justify-content: center;
   margin-bottom: 16px;
 }
+.ai-result-card { margin-top: 12px; padding: 14px; background: #fafaf8; border: 1px solid #e8e5df; border-radius: 8px; font-size: 13px; line-height: 1.7; color: #334155; white-space: pre-wrap; }
 </style>

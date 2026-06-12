@@ -48,7 +48,6 @@
           </div>
           <div class="user-detail">
             <span class="user-name">{{ authStore.user.nickname || authStore.user.username }}</span>
-            <span class="user-role">学生</span>
           </div>
           <button class="logout-btn" title="修改密码" @click="showPwdDialog = true">
             <el-icon><Lock /></el-icon>
@@ -312,10 +311,7 @@ const handleLogout = () => {
   text-overflow: ellipsis;
 }
 
-.user-role {
-  font-size: 11px;
-  color: #5a6380;
-}
+
 
 .logout-btn {
   flex-shrink: 0;

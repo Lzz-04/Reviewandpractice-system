@@ -1,0 +1,11 @@
+{
+  "name": "exam-review-system",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd server && mvn spring-boot:run",
+    "dev:client": "cd client && npm run dev",
+    "install:client": "cd client && npm install",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && mvn package -DskipTests"
+  }
+}

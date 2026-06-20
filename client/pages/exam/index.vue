@@ -41,7 +41,7 @@
         <span>快速组卷</span>
       </div>
       <div class="gen-form">
-        <el-select v-model="genForm.subjectId" placeholder="选择科目" @change="loadChapters" size="large" style="width: 160px">
+        <el-select v-model="genForm.subjectId" placeholder="选择科目" size="large" style="width: 160px">
           <el-option v-for="s in subjects" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
         <el-input v-model="genForm.title" placeholder="考试标题，如：期末模拟测试" size="large" style="width: 220px" />
@@ -120,13 +120,6 @@ async function loadExams() {
     exams.value = page.records || []
   } finally { loading.value = false }
 }
-const chapters = ref([])
-
-async function loadChapters() {
-  if (!genForm.value.subjectId) { chapters.value = []; return }
-  chapters.value = await api.get(`/subjects/${genForm.value.subjectId}/chapters`).catch(() => [])
-}
-
 async function handleGenerate() {
   if (!genForm.value.subjectId) { ElMessage.warning('请选择科目'); return }
   if (!genForm.value.title.trim()) { ElMessage.warning('请输入考试标题'); return }

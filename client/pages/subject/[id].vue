@@ -5,72 +5,81 @@
         返回科目列表
       </el-button>
       <div class="subject-title-row">
-        <h2>{{ subject?.name || '加载中...' }}</h2>
+        <div>
+          <h2>{{ subject?.name || '加载中...' }}</h2>
+          <p v-if="subject?.description">{{ subject.description }}</p>
+        </div>
         <div class="title-actions">
+          <el-button type="primary" @click="startPractice">
+            <el-icon style="margin-right: 5px"><Edit /></el-icon>刷题
+          </el-button>
           <el-button type="success" @click="showImport = true">
             <el-icon style="margin-right: 5px"><Upload /></el-icon>导入题目
           </el-button>
           <el-button type="warning" @click="showAIDialog = true">
             <el-icon style="margin-right: 5px"><MagicStick /></el-icon>AI 出题
           </el-button>
-          <el-button type="primary" @click="showCreate = true">
-            <el-icon style="margin-right: 5px"><Plus /></el-icon>添加章节
+          <el-button type="primary" plain @click="showExamDialog = true">
+            <el-icon style="margin-right: 5px"><Tickets /></el-icon>模拟考
           </el-button>
         </div>
       </div>
-      <p v-if="subject?.description">{{ subject.description }}</p>
     </div>
 
-    <!-- 章节列表 -->
-    <div v-if="chapters.length > 0" class="chapter-list">
-      <div v-for="(ch, idx) in chapters" :key="ch.id" class="chapter-card" :style="{ animationDelay: (idx * 0.05) + 's' }">
-        <div class="chapter-left">
-          <div class="chapter-num">{{ idx + 1 }}</div>
-          <div class="chapter-info">
-            <div class="chapter-name">{{ ch.name }}</div>
-          </div>
-        </div>
-        <div class="chapter-actions">
-          <el-button size="small" @click="viewQuestions(ch)">题目</el-button>
-          <el-button type="primary" size="small" @click="startPractice(ch)">
-            <el-icon style="margin-right: 4px"><Edit /></el-icon>刷题
-          </el-button>
-          <el-button type="success" size="small" @click="startExamForChapter(ch)">
-            <el-icon style="margin-right: 4px"><Tickets /></el-icon>模拟考
-          </el-button>
-          <el-button size="small" @click="editChapter(ch)">编辑</el-button>
-          <el-popconfirm title="确定删除？" @confirm="handleDelete(ch.id)">
+    <div class="question-panel" v-loading="loadingQuestions">
+      <div class="panel-header">
+        <span>题目列表</span>
+        <span class="panel-count">共 {{ questions.length }} 道</span>
+      </div>
+
+      <div class="q-toolbar">
+        <el-input v-model="qSearch.keyword" placeholder="搜索题目内容..." clearable @input="loadQuestions" style="width: 220px">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select v-model="qSearch.difficulty" placeholder="难度" clearable @change="loadQuestions" style="width: 110px">
+          <el-option label="难度1" :value="1" /><el-option label="难度2" :value="2" />
+          <el-option label="难度3" :value="3" /><el-option label="难度4" :value="4" />
+          <el-option label="难度5" :value="5" />
+        </el-select>
+        <el-select v-model="qSearch.sortBy" placeholder="排序" clearable @change="loadQuestions" style="width: 130px">
+          <el-option label="默认(最新)" value="" /><el-option label="按难度" value="difficulty" />
+        </el-select>
+        <el-select v-model="qSearch.type" placeholder="题型" clearable @change="loadQuestions" style="width: 120px">
+          <el-option label="单选题" value="single" /><el-option label="多选题" value="multiple" />
+          <el-option label="判断题" value="judge" />
+        </el-select>
+      </div>
+
+      <div v-if="batchIds.length > 0" class="q-batch-bar">
+        <span>已选 {{ batchIds.length }} 道题目</span>
+        <el-button size="small" @click="showBatchDifficulty = true">批量修改难度</el-button>
+        <el-popconfirm title="确定删除？" @confirm="handleBatchDelete">
+          <template #reference><el-button size="small" type="danger">批量删除</el-button></template>
+        </el-popconfirm>
+        <el-button size="small" @click="batchIds = []">取消选择</el-button>
+      </div>
+
+      <el-empty v-if="!loadingQuestions && questions.length === 0" description="该科目下没有题目" />
+      <div v-else class="question-list">
+        <div v-for="(q, i) in questions" :key="q.id" class="q-item">
+          <el-checkbox :model-value="batchIds.includes(q.id)" @change="toggleBatch(q.id)" />
+          <span class="q-index">{{ i + 1 }}</span>
+          <span class="q-type">{{ typeLabel(q.type) }}</span>
+          <span class="q-diff" v-if="q.difficulty">L{{ q.difficulty }}</span>
+          <span class="q-content">{{ truncateText(q.content, 60) }}</span>
+          <span class="q-answer" :class="q.type === 'judge' ? 'judge-answer' : ''">{{ formatAnswer(q.answer, q.type) }}</span>
+          <el-popconfirm title="确定删除该题目？" @confirm="handleDeleteQuestion(q.id)">
             <template #reference>
-              <el-button size="small" type="danger">删除</el-button>
+              <el-button size="small" type="danger" :icon="Delete">删除</el-button>
             </template>
           </el-popconfirm>
         </div>
       </div>
     </div>
 
-    <el-empty v-else description="还没有章节，点击上方按钮添加" />
-
-    <!-- 章节对话框 -->
-    <el-dialog v-model="showCreate" :title="editingChapter ? '编辑章节' : '添加章节'" width="460px">
-      <el-form :model="chapterForm" label-width="80px">
-        <el-form-item label="章节名称">
-          <el-input v-model="chapterForm.name" placeholder="如：第一章 函数与极限" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreate = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveChapter">保存</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 导入对话框 -->
     <el-dialog v-model="showImport" title="导入题目" width="520px" @closed="resetImport">
-      <el-form :model="importForm" label-width="100px">
-        <el-form-item label="目标章节">
-          <el-select v-model="importForm.chapterId" placeholder="选择章节" style="width: 100%">
-            <el-option v-for="ch in chapters" :key="ch.id" :label="ch.name" :value="ch.id" />
-          </el-select>
-        </el-form-item>
+      <el-form label-width="100px">
         <el-form-item label="上传文件">
           <el-upload
             ref="uploadRef"
@@ -93,7 +102,6 @@
         </el-form-item>
       </el-form>
 
-      <!-- 提取预览 -->
       <div v-if="importFile" style="margin-top: 12px">
         <el-button size="small" @click="handlePreviewExtract" :loading="previewing">
           <el-icon style="margin-right: 4px"><View /></el-icon>提取预览（前10道单选）
@@ -103,7 +111,6 @@
         </div>
       </div>
 
-      <!-- 导入结果 -->
       <div v-if="importResult" class="import-result">
         <div class="result-title">导入结果</div>
         <div class="result-stats">
@@ -118,75 +125,7 @@
 
       <template #footer>
         <el-button @click="showImport = false">关闭</el-button>
-        <el-button type="primary" @click="handleImport" :loading="importing" :disabled="!importFile">
-          开始导入
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 题目列表对话框 -->
-    <el-dialog v-model="showQuestions" :title="questionChapter?.name + ' - 题目列表'" width="800px" @closed="questionChapter = null; batchIds = []">
-      <div v-loading="loadingQuestions">
-        <!-- 搜索和筛选 -->
-        <div class="q-toolbar">
-          <el-input v-model="qSearch.keyword" placeholder="搜索题目内容..." clearable @input="loadQuestions" style="width: 200px">
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <el-select v-model="qSearch.difficulty" placeholder="难度" clearable @change="loadQuestions" style="width: 100px">
-            <el-option label="难度1" :value="1" /><el-option label="难度2" :value="2" />
-            <el-option label="难度3" :value="3" /><el-option label="难度4" :value="4" />
-            <el-option label="难度5" :value="5" />
-          </el-select>
-          <el-select v-model="qSearch.sortBy" placeholder="排序" clearable @change="loadQuestions" style="width: 120px">
-            <el-option label="默认(最新)" value="" /><el-option label="按难度" value="difficulty" />
-          </el-select>
-          <el-select v-model="qSearch.type" placeholder="题型" clearable @change="loadQuestions" style="width: 110px">
-            <el-option label="单选题" value="single" /><el-option label="多选题" value="multiple" />
-            <el-option label="判断题" value="judge" />
-          </el-select>
-        </div>
-
-        <!-- 批量操作栏 -->
-        <div v-if="batchIds.length > 0" class="q-batch-bar">
-          <span>已选 {{ batchIds.length }} 道题目</span>
-          <el-button size="small" @click="showBatchChapter = true">批量移动章节</el-button>
-          <el-button size="small" @click="showBatchDifficulty = true">批量修改难度</el-button>
-          <el-popconfirm title="确定删除？" @confirm="handleBatchDelete">
-            <template #reference><el-button size="small" type="danger">批量删除</el-button></template>
-          </el-popconfirm>
-          <el-button size="small" @click="batchIds = []">取消选择</el-button>
-        </div>
-
-        <el-empty v-if="!loadingQuestions && questions.length === 0" description="该章节下没有题目" />
-        <div v-else class="question-list-dialog">
-          <div v-for="(q, i) in questions" :key="q.id" class="q-item">
-            <el-checkbox :model-value="batchIds.includes(q.id)" @change="toggleBatch(q.id)" />
-            <span class="q-index">{{ i + 1 }}</span>
-            <span class="q-type">{{ typeLabel(q.type) }}</span>
-            <span class="q-diff" v-if="q.difficulty">L{{ q.difficulty }}</span>
-            <span class="q-content">{{ truncateText(q.content, 45) }}</span>
-            <span class="q-answer" :class="q.type === 'judge' ? 'judge-answer' : ''">{{ formatAnswer(q.answer, q.type) }}</span>
-            <el-popconfirm title="确定删除该题目？" @confirm="handleDeleteQuestion(q.id)">
-              <template #reference>
-                <el-button size="small" type="danger" :icon="Delete">删除</el-button>
-              </template>
-            </el-popconfirm>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showQuestions = false">关闭</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 批量修改章节 -->
-    <el-dialog v-model="showBatchChapter" title="批量移动章节" width="400px">
-      <el-select v-model="batchChapterId" placeholder="选择目标章节" style="width: 100%">
-        <el-option v-for="ch in chapters" :key="ch.id" :label="ch.name" :value="ch.id" />
-      </el-select>
-      <template #footer>
-        <el-button @click="showBatchChapter = false">取消</el-button>
-        <el-button type="primary" @click="handleBatchUpdateChapter" :disabled="!batchChapterId">确定</el-button>
+        <el-button type="primary" @click="handleImport" :loading="importing" :disabled="!importFile">开始导入</el-button>
       </template>
     </el-dialog>
 
@@ -206,11 +145,6 @@
     <!-- AI 出题配置对话框 -->
     <el-dialog v-model="showAIDialog" title="AI 智能出题" width="480px" @closed="resetAIDialog">
       <el-form :model="aiForm" label-width="100px">
-        <el-form-item label="目标章节">
-          <el-select v-model="aiForm.chapterId" placeholder="选择章节" style="width: 100%">
-            <el-option v-for="ch in chapters" :key="ch.id" :label="ch.name" :value="ch.id" />
-          </el-select>
-        </el-form-item>
         <el-form-item label="题型">
           <el-select v-model="aiForm.type" placeholder="选择题型" style="width: 100%">
             <el-option label="混合（单选+多选+判断）" value="mixed" />
@@ -256,34 +190,26 @@
             <div v-if="q.options && q.options.length > 0" class="ai-q-options">
               <span v-for="(opt, oi) in q.options" :key="oi" class="ai-option">{{ opt }}</span>
             </div>
-            <div class="ai-q-answer">
-              <span class="ai-label">答案：</span>
-              <span class="ai-value">{{ q.answer }}</span>
-            </div>
-            <div v-if="q.analysis" class="ai-q-analysis">
-              <span class="ai-label">解析：</span>
-              <span class="ai-value">{{ q.analysis }}</span>
-            </div>
+            <div class="ai-q-answer"><span class="ai-label">答案：</span><span class="ai-value">{{ q.answer }}</span></div>
+            <div v-if="q.analysis" class="ai-q-analysis"><span class="ai-label">解析：</span><span class="ai-value">{{ q.analysis }}</span></div>
           </div>
         </div>
       </div>
       <el-empty v-else description="暂无生成结果" />
-      <template #footer>
-        <el-button @click="showAIPreview = false">关闭</el-button>
-      </template>
+      <template #footer><el-button @click="showAIPreview = false">关闭</el-button></template>
     </el-dialog>
 
     <!-- 考试对话框 -->
-    <el-dialog v-model="showExamDialog" title="创建章节模拟考" width="460px">
+    <el-dialog v-model="showExamDialog" title="创建科目模拟考" width="460px">
       <el-form :model="examForm" label-width="110px">
         <el-form-item label="考试标题">
-          <el-input v-model="examForm.title" placeholder="如：第一章单元测试" />
+          <el-input v-model="examForm.title" placeholder="如：科目模拟测试" />
         </el-form-item>
         <el-form-item label="考试时长(分钟)">
           <el-input-number v-model="examForm.duration" :min="5" :max="180" />
         </el-form-item>
         <el-form-item label="题目数量">
-          <el-input-number v-model="examForm.totalCount" :min="5" :max="50" />
+          <el-input-number v-model="examForm.totalCount" :min="5" :max="100" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -296,18 +222,13 @@
 
 <script setup>
 import { ElMessage } from 'element-plus'
-import { Plus, ArrowLeft, Edit, Tickets, Upload, UploadFilled, Delete, Search, View, MagicStick } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Tickets, Upload, UploadFilled, Delete, Search, View, MagicStick } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const api = useApi()
 const subjectId = route.params.id
 const subject = ref(null)
-const chapters = ref([])
-const showCreate = ref(false)
-const editingChapter = ref(null)
-const chapterForm = ref({ name: '' })
 const showImport = ref(false)
-const importForm = ref({ chapterId: null })
 const importFile = ref(null)
 const importing = ref(false)
 const importResult = ref(null)
@@ -315,27 +236,21 @@ const uploadRef = ref(null)
 const previewText = ref('')
 const previewing = ref(false)
 
-const showQuestions = ref(false)
-const questionChapter = ref(null)
 const questions = ref([])
 const loadingQuestions = ref(false)
 const qSearch = ref({ keyword: '', difficulty: null, sortBy: '', type: '' })
 const batchIds = ref([])
-const showBatchChapter = ref(false)
 const showBatchDifficulty = ref(false)
-const batchChapterId = ref(null)
 const batchDifficulty = ref(null)
 
 const showExamDialog = ref(false)
-const examChapter = ref(null)
 const examForm = ref({ title: '', duration: 30, totalCount: 10 })
 
-// === AI 出题 ===
 const showAIDialog = ref(false)
 const showAIPreview = ref(false)
 const aiGenerating = ref(false)
 const aiSaving = ref(false)
-const aiForm = ref({ chapterId: null, type: 'mixed', difficulty: 3, count: 5 })
+const aiForm = ref({ type: 'mixed', difficulty: 3, count: 5 })
 const aiGenerated = ref([])
 const aiAllSelected = ref(false)
 const aiIndeterminate = ref(false)
@@ -345,26 +260,21 @@ function toggleAIAll(val) {
   aiGenerated.value.forEach(q => { q.selected = val })
   aiIndeterminate.value = false
 }
+
 function resetAIDialog() {
   if (showAIDialog.value || showAIPreview.value) return
-  aiForm.value = { chapterId: null, type: 'mixed', difficulty: 3, count: 5 }
+  aiForm.value = { type: 'mixed', difficulty: 3, count: 5 }
   aiGenerated.value = []
   aiAllSelected.value = false
   aiIndeterminate.value = false
 }
 
 async function handleAIGenerate() {
-  if (!aiForm.value.chapterId) { ElMessage.warning('请选择目标章节'); return }
-  const ch = chapters.value.find(c => c.id === aiForm.value.chapterId)
-  if (!ch) { ElMessage.warning('章节不存在'); return }
-
   aiGenerating.value = true
   try {
     const data = await api.post('/ai/generate', {
-      chapterId: aiForm.value.chapterId,
       subjectId: parseInt(subjectId),
       subjectName: subject.value?.name || '',
-      chapterName: ch.name,
       type: aiForm.value.type,
       difficulty: aiForm.value.difficulty,
       count: aiForm.value.count,
@@ -375,7 +285,6 @@ async function handleAIGenerate() {
     showAIPreview.value = true
     ElMessage.success(`AI 已生成 ${aiGenerated.value.length} 道题目`)
   } catch {
-    // 错误已在 useApi 中处理
   } finally {
     aiGenerating.value = false
   }
@@ -394,7 +303,6 @@ async function handleAISave() {
         ? JSON.stringify(q.options.map((o, i) => ({ label: String.fromCharCode(65 + i), text: o.replace(/^[A-D][.、\s]+/, '') })))
         : '[]'
       await api.post('/questions', {
-        chapterId: aiForm.value.chapterId,
         subjectId: parseInt(subjectId),
         type: q.type,
         content: q.content,
@@ -413,8 +321,7 @@ async function handleAISave() {
     ElMessage.success(`成功保存 ${saved} 道题目` + (failed > 0 ? `，${failed} 道失败` : ''))
     showAIPreview.value = false
     resetAIDialog()
-    // 刷新章节统计
-    await load()
+    await loadQuestions()
   }
 }
 
@@ -429,40 +336,15 @@ const formatAnswer = (ans, type) => {
 async function load() {
   try {
     subject.value = await api.get(`/subjects/${subjectId}`)
-    chapters.value = await api.get(`/subjects/${subjectId}/chapters`)
+    examForm.value.title = `${subject.value?.name || '科目'}模拟测试`
+    await loadQuestions()
   } catch {}
-}
-
-function editChapter(ch) {
-  editingChapter.value = ch
-  chapterForm.value = { name: ch.name }
-  showCreate.value = true
-}
-
-async function handleSaveChapter() {
-  if (!chapterForm.value.name.trim()) { ElMessage.warning('请输入章节名称'); return }
-  if (editingChapter.value) await api.put(`/chapters/${editingChapter.value.id}`, chapterForm.value)
-  else await api.post(`/subjects/${subjectId}/chapters`, { ...chapterForm.value, subjectId: parseInt(subjectId) })
-  showCreate.value = false
-  editingChapter.value = null
-  chapterForm.value = { name: '' }
-  await load()
-}
-
-async function handleDelete(id) {
-  try {
-    await api.delete(`/chapters/${id}`)
-    await load()
-  } catch {
-    // 错误提示已在 useApi 中处理
-  }
 }
 
 function handleFileChange(file) { importFile.value = file.raw }
 function handleFileRemove() { importFile.value = null }
 
 function resetImport() {
-  importForm.value = { chapterId: null }
   importFile.value = null
   importResult.value = null
   previewText.value = ''
@@ -470,7 +352,6 @@ function resetImport() {
 }
 
 async function handleImport() {
-  if (!importForm.value.chapterId) { ElMessage.warning('请选择目标章节'); return }
   if (!importFile.value) { ElMessage.warning('请选择文件'); return }
 
   importing.value = true
@@ -479,22 +360,18 @@ async function handleImport() {
     const formData = new FormData()
     formData.append('file', importFile.value)
     formData.append('subjectId', subjectId)
-    formData.append('chapterId', importForm.value.chapterId)
 
     const config = useRuntimeConfig()
     const headers = {}
     const token = localStorage.getItem('auth_token')
     if (token) headers['Authorization'] = `Bearer ${token}`
-    const response = await fetch(`${config.public.apiBase}/import`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    })
+    const response = await fetch(`${config.public.apiBase}/import`, { method: 'POST', headers, body: formData })
     const res = await response.json()
     if (res.code !== 200) { ElMessage.error(res.message || '导入失败'); return }
     importResult.value = res.data
     if (res.data.failed === 0) ElMessage.success(res.message)
     else ElMessage.warning(res.message)
+    await loadQuestions()
   } catch { ElMessage.error('导入失败')
   } finally { importing.value = false }
 }
@@ -519,18 +396,10 @@ async function handlePreviewExtract() {
   } finally { previewing.value = false }
 }
 
-async function viewQuestions(ch) {
-  questionChapter.value = ch
-  showQuestions.value = true
-  qSearch.value = { keyword: '', difficulty: null, sortBy: '', type: '' }
-  batchIds.value = []
-  await loadQuestions()
-}
-
 async function loadQuestions() {
   loadingQuestions.value = true
   try {
-    const params = { chapterId: questionChapter.value.id, pageSize: 1000 }
+    const params = { subjectId, pageSize: 1000 }
     if (qSearch.value.keyword) params.keyword = qSearch.value.keyword
     if (qSearch.value.difficulty) params.difficulty = qSearch.value.difficulty
     if (qSearch.value.sortBy) params.sortBy = qSearch.value.sortBy
@@ -555,25 +424,13 @@ async function handleDeleteQuestion(id) {
     await api.delete(`/questions/${id}`)
     questions.value = questions.value.filter(q => q.id !== id)
     batchIds.value = batchIds.value.filter(bid => bid !== id)
-  } catch {
-    // 错误提示已在 useApi 中处理
-  }
+  } catch {}
 }
 
 async function handleBatchDelete() {
   try {
     await api.delete('/questions/batch', batchIds.value)
     ElMessage.success('批量删除成功')
-    batchIds.value = []
-    await loadQuestions()
-  } catch {}
-}
-
-async function handleBatchUpdateChapter() {
-  try {
-    await api.put('/questions/batch', { ids: batchIds.value, chapterId: batchChapterId.value })
-    ElMessage.success('批量移动成功')
-    showBatchChapter.value = false
     batchIds.value = []
     await loadQuestions()
   } catch {}
@@ -589,19 +446,14 @@ async function handleBatchUpdateDifficulty() {
   } catch {}
 }
 
-function startPractice(ch) { navigateTo(`/practice/${ch.id}`) }
-
-function startExamForChapter(ch) {
-  examChapter.value = ch
-  examForm.value = { title: ch.name + ' 单元测试', duration: 30, totalCount: 10 }
-  showExamDialog.value = true
-}
+function startPractice() { navigateTo(`/practice/${subjectId}`) }
 
 async function handleCreateExam() {
   const examPaper = await api.post('/exams/generate', {
-    subjectId: parseInt(subjectId), title: examForm.value.title,
-    duration: examForm.value.duration, totalCount: examForm.value.totalCount,
-    chapterIds: [examChapter.value.id],
+    subjectId: parseInt(subjectId),
+    title: examForm.value.title,
+    duration: examForm.value.duration,
+    totalCount: examForm.value.totalCount,
   })
   showExamDialog.value = false
   await useExamStore().startExam(examPaper.id)
@@ -613,328 +465,54 @@ onMounted(load)
 
 <style scoped>
 .back-btn { margin-bottom: 8px; }
-
-.subject-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 8px 0 4px;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.subject-title-row h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.title-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.chapter-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chapter-card {
-  background: #fff;
-  border: 1px solid #e8e5df;
-  border-radius: 10px;
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 1px 2px rgba(22,27,43,0.03);
-  transition: box-shadow 0.2s, transform 0.2s;
-  animation: cardSlide 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
-@keyframes cardSlide {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.chapter-card:hover {
-  box-shadow: 0 4px 16px rgba(22,27,43,0.06);
-  transform: translateX(3px);
-}
-
-.chapter-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.chapter-num {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b5dbf, #5876d8);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.chapter-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.chapter-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* Import dialog */
+.subject-title-row { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 4px; flex-wrap: wrap; gap: 10px; }
+.subject-title-row h2 { font-size: 24px; font-weight: 700; color: #1e293b; }
+.title-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.question-panel { background: #fff; border: 1px solid #e8e5df; border-radius: 12px; box-shadow: 0 1px 3px rgba(22,27,43,0.04); overflow: hidden; }
+.panel-header { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #f0ede7; font-weight: 650; color: #1e293b; }
+.panel-count { font-size: 12px; color: #94a3b8; font-weight: 500; }
+.q-toolbar { display: flex; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+.q-batch-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 12px 20px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 13px; color: #1e40af; flex-wrap: wrap; }
+.q-batch-bar span { font-weight: 600; }
+.question-list { max-height: 62vh; overflow-y: auto; }
+.q-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.q-item:hover { background: #f8fafc; }
+.q-index { width: 24px; height: 24px; border-radius: 6px; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.q-type { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: #eff6ff; color: #3b5dbf; flex-shrink: 0; }
+.q-diff { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: #fef6ee; color: #e0781a; flex-shrink: 0; font-weight: 600; }
+.q-content { flex: 1; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-answer { font-weight: 600; color: #15803d; flex-shrink: 0; }
+.judge-answer { color: #dc2626; }
 .upload-icon { color: #3b5dbf; margin-bottom: 8px; }
 .upload-text { font-size: 14px; color: #334155; margin-bottom: 4px; }
 .upload-hint { font-size: 12px; color: #94a3b8; }
 .upload-hint--format { margin-top: 6px; line-height: 1.6; }
-
-.import-result {
-  margin-top: 16px;
-  padding: 16px;
-  background: #fafaf8;
-  border-radius: 8px;
-  border: 1px solid #e8e5df;
-}
-
-.result-title {
-  font-weight: 650;
-  font-size: 14px;
-  color: #1e293b;
-  margin-bottom: 8px;
-}
-
-.result-stats {
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
-  color: #64748b;
-}
+.import-result { margin-top: 16px; padding: 16px; background: #fafaf8; border-radius: 8px; border: 1px solid #e8e5df; }
+.result-title { font-weight: 650; font-size: 14px; color: #1e293b; margin-bottom: 8px; }
+.result-stats { display: flex; gap: 16px; font-size: 13px; color: #64748b; }
 .stat-success { color: #15803d; font-weight: 600; }
 .stat-fail { color: #dc2626; font-weight: 600; }
-
-.result-errors {
-  margin-top: 10px;
-  max-height: 150px;
-  overflow-y: auto;
-}
-.error-item {
-  font-size: 12px;
-  color: #dc2626;
-  padding: 4px 0;
-  border-bottom: 1px solid #fee2e2;
-}
-
-.preview-box {
-  margin-top: 10px;
-  padding: 14px;
-  background: #fafaf8;
-  border: 1px solid #e8e5df;
-  border-radius: 8px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.preview-content {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.7;
-  color: #334155;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: 'Menlo', 'Consolas', monospace;
-}
-
-/* 题目列表对话框 */
-.question-list-dialog {
-  max-height: 50vh;
-  overflow-y: auto;
-}
-.q-toolbar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.q-batch-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: #1e40af;
-  flex-wrap: wrap;
-}
-.q-batch-bar span { font-weight: 600; }
-.q-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 8px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 13px;
-}
-.q-item:hover { background: #f8fafc; }
-.q-index {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: #e2e8f0;
-  color: #475569;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.q-type {
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #eff6ff;
-  color: #3b5dbf;
-  flex-shrink: 0;
-}
-.q-diff {
-  font-size: 11px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: #fef6ee;
-  color: #e0781a;
-  flex-shrink: 0;
-  font-weight: 600;
-}
-.q-content {
-  flex: 1;
-  color: #334155;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.q-answer {
-  font-weight: 600;
-  color: #15803d;
-  flex-shrink: 0;
-}
-.judge-answer { color: #dc2626; }
-
-/* === AI 出题预览 === */
-.ai-preview-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-.ai-preview-count {
-  flex: 1;
-  font-size: 13px;
-  color: #64748b;
-}
-.ai-preview-list {
-  max-height: 55vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.ai-question-card {
-  padding: 16px;
-  border: 1px solid #e8e5df;
-  border-radius: 10px;
-  background: #fafaf8;
-  transition: box-shadow 0.2s;
-}
-.ai-question-card:hover {
-  box-shadow: 0 2px 8px rgba(22,27,43,0.06);
-}
-.ai-q-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.ai-q-index {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #e6a23c, #f0a842);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.ai-q-type {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
+.result-errors { margin-top: 10px; max-height: 150px; overflow-y: auto; }
+.error-item { font-size: 12px; color: #dc2626; padding: 4px 0; border-bottom: 1px solid #fee2e2; }
+.preview-box { margin-top: 10px; padding: 14px; background: #fafaf8; border: 1px solid #e8e5df; border-radius: 8px; max-height: 400px; overflow-y: auto; }
+.preview-content { margin: 0; font-size: 13px; line-height: 1.7; color: #334155; white-space: pre-wrap; word-break: break-all; font-family: 'Menlo', 'Consolas', monospace; }
+.ai-preview-toolbar { display: flex; align-items: center; gap: 16px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px; }
+.ai-preview-count { flex: 1; font-size: 13px; color: #64748b; }
+.ai-preview-list { max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.ai-question-card { padding: 16px; border: 1px solid #e8e5df; border-radius: 10px; background: #fafaf8; transition: box-shadow 0.2s; }
+.ai-question-card:hover { box-shadow: 0 2px 8px rgba(22,27,43,0.06); }
+.ai-q-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ai-q-index { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #e6a23c, #f0a842); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.ai-q-type { font-size: 12px; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
 .type-single { background: #eff6ff; color: #3b5dbf; }
 .type-multiple { background: #fef3c7; color: #d97706; }
 .type-judge { background: #f0fdf4; color: #15803d; }
-.ai-q-diff {
-  font-size: 12px;
-  color: #94a3b8;
-}
-.ai-q-content {
-  font-size: 14px;
-  color: #1e293b;
-  line-height: 1.6;
-  margin-bottom: 8px;
-}
-.ai-q-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-bottom: 8px;
-}
-.ai-option {
-  font-size: 13px;
-  color: #475569;
-  background: #fff;
-  padding: 2px 10px;
-  border-radius: 4px;
-  border: 1px solid #e2e8f0;
-}
-.ai-q-answer, .ai-q-analysis {
-  font-size: 13px;
-  line-height: 1.5;
-  margin-top: 4px;
-}
-.ai-label {
-  font-weight: 600;
-  color: #64748b;
-}
-.ai-q-answer .ai-value {
-  color: #15803d;
-  font-weight: 600;
-}
-.ai-q-analysis .ai-value {
-  color: #475569;
-}
+.ai-q-diff { font-size: 12px; color: #94a3b8; }
+.ai-q-content { font-size: 14px; color: #1e293b; line-height: 1.6; margin-bottom: 8px; }
+.ai-q-options { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }
+.ai-option { font-size: 13px; color: #475569; background: #fff; padding: 2px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
+.ai-q-answer, .ai-q-analysis { font-size: 13px; line-height: 1.5; margin-top: 4px; }
+.ai-label { font-weight: 600; color: #64748b; }
+.ai-q-answer .ai-value { color: #15803d; font-weight: 600; }
+.ai-q-analysis .ai-value { color: #475569; }
 </style>

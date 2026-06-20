@@ -6,7 +6,6 @@ import com.examreview.dto.WrongQuestionDTO;
 import com.examreview.entity.AnswerRecord;
 import com.examreview.entity.Question;
 import com.examreview.mapper.AnswerRecordMapper;
-import com.examreview.mapper.ChapterMapper;
 import com.examreview.service.QuestionService;
 import com.examreview.service.WrongBookService;
 import com.examreview.util.AnswerChecker;
@@ -27,36 +26,25 @@ public class PracticeController {
     private final QuestionService questionService;
     private final WrongBookService wrongBookService;
     private final AnswerRecordMapper answerRecordMapper;
-    private final ChapterMapper chapterMapper;
 
-    @GetMapping("/start/{chapterId}")
+    @GetMapping("/start/subject/{subjectId}")
     public ApiResponse<Map<String, Object>> startPractice(
-            @PathVariable Integer chapterId,
+            @PathVariable Integer subjectId,
             @RequestParam(defaultValue = "sequential") String mode,
             @RequestParam(defaultValue = "false") boolean wrongOnly) {
         Long userId = SecurityUtil.getCurrentUserId();
-        // 校验章节存在
-        if (chapterMapper.selectById(chapterId) == null) {
-            return ApiResponse.fail("章节不存在");
-        }
         List<Question> questions;
         if (wrongOnly) {
             List<WrongQuestionDTO> wrongList = wrongBookService.getList(1, 10000, null, 0, userId).getRecords();
-            Set<Integer> wrongChapterIds = wrongList.stream()
-                    .map(WrongQuestionDTO::getChapterId).collect(Collectors.toSet());
-            if (!wrongChapterIds.contains(chapterId)) {
-                questions = Collections.emptyList();
-            } else {
-                questions = wrongList.stream()
-                        .filter(w -> w.getChapterId().equals(chapterId))
-                        .map(this::toQuestion)
-                        .collect(Collectors.toList());
-                if (questions.size() > 50) {
-                    questions = questions.subList(0, 50);
-                }
+            questions = wrongList.stream()
+                    .filter(w -> w.getSubjectId().equals(subjectId))
+                    .map(this::toQuestion)
+                    .collect(Collectors.toList());
+            if (questions.size() > 50) {
+                questions = questions.subList(0, 50);
             }
         } else {
-            questions = questionService.getRandomQuestions(chapterId, 50, userId);
+            questions = questionService.getRandomQuestions(subjectId, 50, userId);
         }
         if ("random".equals(mode)) {
             Collections.shuffle(questions);
@@ -93,7 +81,6 @@ public class PracticeController {
     private Question toQuestion(WrongQuestionDTO dto) {
         Question q = new Question();
         q.setId(dto.getQuestionId());
-        q.setChapterId(dto.getChapterId());
         q.setSubjectId(dto.getSubjectId());
         q.setType(dto.getType());
         q.setContent(dto.getContent());

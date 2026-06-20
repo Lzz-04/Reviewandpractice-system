@@ -77,6 +77,19 @@
       </div>
     </div>
 
+    <!-- AI 考试总结 -->
+    <div v-if="result" class="ai-summary-card">
+      <div class="ai-summary-header">
+        <span>🤖 AI 成绩分析</span>
+        <el-button size="small" type="primary" @click="loadAISummary" :loading="aiSummaryLoading">
+          {{ aiSummary ? '重新分析' : '生成分析' }}
+        </el-button>
+      </div>
+      <div v-if="aiSummaryLoading" class="ai-summary-loading">AI 正在分析考试数据...</div>
+      <div v-else-if="aiSummary" class="ai-summary-content">{{ aiSummary }}</div>
+      <div v-else class="ai-summary-hint">点击按钮获取 AI 对本次考试的评价和建议</div>
+    </div>
+
     <el-skeleton v-else :rows="10" animated />
   </div>
 </template>
@@ -85,6 +98,8 @@
 const route = useRoute()
 const api = useApi()
 const result = ref(null)
+const aiSummary = ref('')
+const aiSummaryLoading = ref(false)
 
 const scoreLevel = computed(() => {
   if (!result.value) return ''
@@ -105,6 +120,12 @@ function formatDuration(seconds) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}分${s}秒`
+}
+
+async function loadAISummary() {
+  aiSummaryLoading.value = true
+  try { aiSummary.value = await api.get(`/exams/records/${route.params.recordId}/ai-summary`) } catch {}
+  finally { aiSummaryLoading.value = false }
 }
 
 onMounted(async () => {
@@ -270,4 +291,9 @@ onMounted(async () => {
 .clr-ok { color: #15803d; font-weight: 650; }
 .clr-err { color: #dc2626; font-weight: 650; }
 .clr-warn { color: #d97706; }
+.ai-summary-card { background: #fff; border: 1px solid #e8e5df; border-radius: 12px; overflow: hidden; margin-top: 20px; }
+.ai-summary-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #f0ede7; font-weight: 650; font-size: 15px; }
+.ai-summary-loading { padding: 24px; color: #94a3b8; font-size: 14px; text-align: center; }
+.ai-summary-content { padding: 20px; font-size: 14px; line-height: 1.8; color: #334155; white-space: pre-wrap; }
+.ai-summary-hint { padding: 24px; color: #94a3b8; font-size: 14px; text-align: center; }
 </style>

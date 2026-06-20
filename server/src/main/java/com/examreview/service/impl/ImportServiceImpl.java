@@ -20,6 +20,11 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * 文件导入服务实现类
+ * 支持 XLSX/DOCX/PDF/TXT 四种格式的题目解析和批量导入
+ * 文本解析支持两种模式：标准标签格式和试卷格式自动识别
+ */
 @Service
 @RequiredArgsConstructor
 public class ImportServiceImpl implements ImportService {
@@ -29,24 +34,29 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public String previewExtract(MultipartFile file) throws IOException {
+        // 文件名校验
         String filename = file.getOriginalFilename();
         if (filename == null) {
             throw new IllegalArgumentException("文件名不能为空");
         }
+        
+        // 根据扩展名选择解析器
         String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
         List<Question> questions = switch (ext) {
-            case "xlsx" -> parseXlsx(file, null, null);
-            case "docx" -> parseDocx(file, null, null);
-            case "pdf" -> parsePdf(file, null, null);
-            case "txt" -> parseTxt(file, null, null);
+            case "xlsx" -> parseXlsx(file, null);
+            case "docx" -> parseDocx(file, null);
+            case "pdf" -> parsePdf(file, null);
+            case "txt" -> parseTxt(file, null);
             default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、pdf、xlsx、txt");
         };
 
+        // 只取前 10 道单选题用于预览
         List<Question> singles = questions.stream()
             .filter(q -> "single".equals(q.getType()))
             .limit(10)
             .toList();
 
+        // 格式化为标准文本格式
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < singles.size(); i++) {
             Question q = singles.get(i);
@@ -69,24 +79,28 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     @Transactional
-    public ImportResultDTO importQuestions(MultipartFile file, Integer subjectId, Integer chapterId, Long userId) throws IOException {
+    public ImportResultDTO importQuestions(MultipartFile file, Integer subjectId, Long userId) throws IOException {
+        // 文件名校验
         String filename = file.getOriginalFilename();
         if (filename == null) {
             throw new IllegalArgumentException("文件名不能为空");
         }
 
+        // 根据扩展名选择解析器
         String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
         List<Question> questions = switch (ext) {
-            case "xlsx" -> parseXlsx(file, subjectId, chapterId);
-            case "docx" -> parseDocx(file, subjectId, chapterId);
-            case "pdf" -> parsePdf(file, subjectId, chapterId);
-            case "txt" -> parseTxt(file, subjectId, chapterId);
+            case "xlsx" -> parseXlsx(file, subjectId);
+            case "docx" -> parseDocx(file, subjectId);
+            case "pdf" -> parsePdf(file, subjectId);
+            case "txt" -> parseTxt(file, subjectId);
             default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、pdf、xlsx、txt");
         };
 
+        // 统计导入结果
         ImportResultDTO result = new ImportResultDTO();
         result.setTotal(questions.size());
 
+        // 逐条插入，记录成功/失败数量
         for (Question q : questions) {
             try {
                 validateQuestion(q);
@@ -101,8 +115,14 @@ public class ImportServiceImpl implements ImportService {
         return result;
     }
 
-    // === XLSX 解析 ===
-    private List<Question> parseXlsx(MultipartFile file, Integer subjectId, Integer chapterId) throws IOException {
+    // ==================== XLSX 解析 ====================
+    
+    /**
+     * 解析 Excel 文件
+     * 假设第一行为表头，从第二行开始读取题目数据
+     * 列顺序：题型 | 题目内容 | A 选项 | B 选项 | C 选项 | D 选项 | E 选项 | F 选项 | 答案 | 解析 | 难度
+     */
+    private List<Question> parseXlsx(MultipartFile file, Integer subjectId) throws IOException {
         List<Question> list = new ArrayList<>();
         try (XSSFWorkbook wb = new XSSFWorkbook(file.getInputStream())) {
             var sheet = wb.getSheetAt(0);
@@ -117,7 +137,6 @@ public class ImportServiceImpl implements ImportService {
 
                 Question q = new Question();
                 q.setSubjectId(subjectId);
-                q.setChapterId(chapterId);
                 q.setType(mapType(type));
                 q.setContent(content);
 
@@ -140,35 +159,55 @@ public class ImportServiceImpl implements ImportService {
         return list;
     }
 
-    // === DOCX 解析 ===
-    private List<Question> parseDocx(MultipartFile file, Integer subjectId, Integer chapterId) throws IOException {
+    // ==================== DOCX 解析 ====================
+    
+    /**
+     * 解析 Word 文档
+     * 提取所有段落文本后，调用文本解析器处理
+     */
+    private List<Question> parseDocx(MultipartFile file, Integer subjectId) throws IOException {
         try (XWPFDocument doc = new XWPFDocument(file.getInputStream())) {
             StringBuilder sb = new StringBuilder();
             doc.getParagraphs().forEach(p -> sb.append(p.getText()).append("\n"));
-            return parseText(sb.toString(), subjectId, chapterId);
+            return parseText(sb.toString(), subjectId);
         }
     }
 
-    // === PDF 解析 ===
-    private List<Question> parsePdf(MultipartFile file, Integer subjectId, Integer chapterId) throws IOException {
+    // ==================== PDF 解析 ====================
+    
+    /**
+     * 解析 PDF 文档
+     * 使用 PDFBox 提取文本后，调用文本解析器处理
+     */
+    private List<Question> parsePdf(MultipartFile file, Integer subjectId) throws IOException {
         try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
             PDFTextStripper stripper = new PDFTextStripper();
             String text = stripper.getText(doc);
-            return parseText(text, subjectId, chapterId);
+            return parseText(text, subjectId);
         }
     }
 
-    // === TXT 解析 ===
-    private List<Question> parseTxt(MultipartFile file, Integer subjectId, Integer chapterId) throws IOException {
+    // ==================== TXT 解析 ====================
+    
+    /**
+     * 解析 TXT 文件
+     * 按 UTF-8 编码读取后，调用文本解析器处理
+     */
+    private List<Question> parseTxt(MultipartFile file, Integer subjectId) throws IOException {
         String text = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
-        return parseText(text, subjectId, chapterId);
+        return parseText(text, subjectId);
     }
 
-    // === 文本格式解析（DOCX/PDF/TXT 通用） ===
-    private List<Question> parseText(String text, Integer subjectId, Integer chapterId) {
+    // ==================== 文本格式解析（DOCX/PDF/TXT 通用） ====================
+    
+    /**
+     * 文本格式解析入口
+     * 自动识别格式：有"题型："标签 → 标准格式，否则有编号 + 内联选项 → 试卷格式
+     */
+    private List<Question> parseText(String text, Integer subjectId) {
         // 格式检测：有 题型：标签 → 标准格式，否则有编号+内联选项 → 试卷格式
         if (isExamPaperFormat(text)) {
-            return parseExamPaper(text, subjectId, chapterId);
+            return parseExamPaper(text, subjectId);
         }
         List<Question> list = new ArrayList<>();
         // 按空白行分割题目块
@@ -179,7 +218,6 @@ public class ImportServiceImpl implements ImportService {
             Question q = parseTextBlock(block);
             if (q != null) {
                 q.setSubjectId(subjectId);
-                q.setChapterId(chapterId);
                 list.add(q);
             }
         }
@@ -188,13 +226,22 @@ public class ImportServiceImpl implements ImportService {
 
     private static final Pattern EXAM_PAPER_CHECK = Pattern.compile("(?m)^\\d+[.、．]\\s");
 
+    /**
+     * 判断是否为试卷格式
+     * 试卷格式特征：有题号（1、2、3...）且无"题型："标签
+     */
     private boolean isExamPaperFormat(String text) {
         if (text.contains("题型：") || text.contains("题型:")) return false;
         return EXAM_PAPER_CHECK.matcher(text).find();
     }
 
-    // === 试卷格式解析 ===
-    private List<Question> parseExamPaper(String text, Integer subjectId, Integer chapterId) {
+    // ==================== 试卷格式解析 ====================
+    
+    /**
+     * 解析试卷格式文本
+     * 特征：题号 + 内联选项 + 答案区
+     */
+    private List<Question> parseExamPaper(String text, Integer subjectId) {
         text = text.replace("\r\n", "\n").replace("\r", "\n");
 
         // 1. 先定位答案区边界：编号重置为1且紧跟单个答案字母的短行
@@ -242,13 +289,16 @@ public class ImportServiceImpl implements ImportService {
             Question q = parseExamQuestion(block, answerMap);
             if (q != null) {
                 q.setSubjectId(subjectId);
-                q.setChapterId(chapterId);
                 list.add(q);
             }
         }
         return list;
     }
 
+    /**
+     * 解析单个试卷题目块
+     * 提取题号、题干、选项，并从答案映射中获取答案
+     */
     private Question parseExamQuestion(String block, Map<Integer, String> answerMap) {
         // 提取题号
         Pattern numPat = Pattern.compile("^(\\d+)[.、．]\\s");
@@ -305,12 +355,21 @@ public class ImportServiceImpl implements ImportService {
         return q;
     }
 
+    /**
+     * 根据答案判断题型
+     */
     private String detectExamType(String answer) {
         if (answer.matches("[TF√×对错]")) return "judge";
         if (answer.length() > 1) return "multiple";
         return "single";
     }
 
+    // ==================== 标准格式解析 ====================
+    
+    /**
+     * 解析标准格式题目块
+     * 标准格式标签：题型：/题目：/A./B./C./D./答案：/解析：
+     */
     private Question parseTextBlock(String block) {
         String[] lines = block.split("\n");
         Question q = new Question();
@@ -367,8 +426,11 @@ public class ImportServiceImpl implements ImportService {
         return q;
     }
 
-    // === 工具方法 ===
+    // ==================== 工具方法 ====================
 
+    /**
+     * 获取单元格字符串值
+     */
     private String getCellStr(org.apache.poi.ss.usermodel.Row row, int idx) {
         var cell = row.getCell(idx);
         if (cell == null) return "";
@@ -383,6 +445,9 @@ public class ImportServiceImpl implements ImportService {
         };
     }
 
+    /**
+     * 题型映射：中文/英文 → 标准题型（single/multiple/judge）
+     */
     private String mapType(String raw) {
         String s = raw.trim();
         if (s.contains("单选") || s.equalsIgnoreCase("single")) return "single";
@@ -391,6 +456,9 @@ public class ImportServiceImpl implements ImportService {
         return s;
     }
 
+    /**
+     * 选项列表转 JSON 字符串
+     */
     private String toJson(List<Map<String, String>> options) {
         try {
             return OBJECT_MAPPER.writeValueAsString(options);
@@ -399,6 +467,9 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
+    /**
+     * 校验题目基本信息
+     */
     private void validateQuestion(Question q) {
         if (q.getType() == null || q.getType().isEmpty()) throw new IllegalArgumentException("题型不能为空");
         if (!List.of("single", "multiple", "judge").contains(q.getType()))
@@ -409,6 +480,9 @@ public class ImportServiceImpl implements ImportService {
             throw new IllegalArgumentException("答案不能为空");
     }
 
+    /**
+     * 字符串截断（用于错误提示）
+     */
     private String truncate(String s, int max) {
         return s != null && s.length() > max ? s.substring(0, max) + "…" : s;
     }

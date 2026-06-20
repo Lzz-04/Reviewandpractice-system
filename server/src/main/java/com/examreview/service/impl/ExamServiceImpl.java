@@ -12,7 +12,6 @@ import com.examreview.exception.BusinessException;
 import com.examreview.mapper.*;
 import com.examreview.service.ExamService;
 import com.examreview.service.WrongBookService;
-import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +42,7 @@ public class ExamServiceImpl implements ExamService {
         if (page == null || page < 1) page = 1;
         if (pageSize == null || pageSize < 1) pageSize = 20;
         LambdaQueryWrapper<ExamPaper> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(!SecurityUtil.isAdmin(), ExamPaper::getUserId, userId);
+        wrapper.eq(ExamPaper::getUserId, userId);
         if (subjectId != null) {
             wrapper.eq(ExamPaper::getSubjectId, subjectId);
         }
@@ -57,7 +56,7 @@ public class ExamServiceImpl implements ExamService {
         ExamPaper paper = examPaperMapper.selectOne(
                 new LambdaQueryWrapper<ExamPaper>()
                         .eq(ExamPaper::getId, id)
-                        .eq(!SecurityUtil.isAdmin(), ExamPaper::getUserId, userId));
+                        .eq(ExamPaper::getUserId, userId));
         if (paper == null) {
             throw new BusinessException("试卷不存在");
         }
@@ -83,11 +82,6 @@ public class ExamServiceImpl implements ExamService {
         }
         // 查询题目池（仅当前用户）
         List<Question> pool = questionMapper.selectBySubject(dto.getSubjectId(), userId);
-        if (dto.getChapterIds() != null && !dto.getChapterIds().isEmpty()) {
-            pool = pool.stream()
-                    .filter(q -> dto.getChapterIds().contains(q.getChapterId()))
-                    .collect(Collectors.toList());
-        }
         if (pool.size() < dto.getTotalCount()) {
             throw new BusinessException("题库题目数量不足，当前可用: " + pool.size() + " 道");
         }
@@ -141,7 +135,7 @@ public class ExamServiceImpl implements ExamService {
         // 检查是否已有活跃的考试记录（进行中或已暂停）
         LambdaQueryWrapper<ExamRecord> activeWrapper = new LambdaQueryWrapper<ExamRecord>()
                 .eq(ExamRecord::getExamId, examId)
-                .eq(!SecurityUtil.isAdmin(), ExamRecord::getUserId, userId)
+                .eq(ExamRecord::getUserId, userId)
                 .in(ExamRecord::getStatus, "in_progress", "paused");
         ExamRecord existing = examRecordMapper.selectOne(activeWrapper);
         if (existing != null) {
@@ -166,7 +160,7 @@ public class ExamServiceImpl implements ExamService {
         if (record == null) {
             throw new BusinessException("考试记录不存在");
         }
-        if (!SecurityUtil.isAdmin() && !record.getUserId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new BusinessException("无权操作此考试记录");
         }
         if (record.getFinishedAt() != null) {
@@ -258,7 +252,7 @@ public class ExamServiceImpl implements ExamService {
         if (record == null) {
             throw new BusinessException("考试记录不存在");
         }
-        if (!SecurityUtil.isAdmin() && !record.getUserId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new BusinessException("无权操作此考试记录");
         }
         if (!"in_progress".equals(record.getStatus())) {
@@ -300,7 +294,7 @@ public class ExamServiceImpl implements ExamService {
         if (record == null) {
             throw new BusinessException("考试记录不存在");
         }
-        if (!SecurityUtil.isAdmin() && !record.getUserId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new BusinessException("无权操作此考试记录");
         }
         if (!"paused".equals(record.getStatus())) {
@@ -318,7 +312,7 @@ public class ExamServiceImpl implements ExamService {
         List<AnswerRecord> answers = answerRecordMapper.selectList(
                 new LambdaQueryWrapper<AnswerRecord>()
                         .eq(AnswerRecord::getExamId, record.getExamId())
-                        .eq(!SecurityUtil.isAdmin(), AnswerRecord::getUserId, userId)
+                        .eq(AnswerRecord::getUserId, userId)
                         .orderByDesc(AnswerRecord::getAnsweredAt));
         for (AnswerRecord ar : answers) {
             // 只保留每道题最新的一条答案
@@ -336,7 +330,7 @@ public class ExamServiceImpl implements ExamService {
         return examRecordMapper.selectPage(
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, pageSize),
                 new LambdaQueryWrapper<ExamRecord>()
-                        .eq(!SecurityUtil.isAdmin(), ExamRecord::getUserId, userId)
+                        .eq(ExamRecord::getUserId, userId)
                         .orderByDesc(ExamRecord::getCreatedAt));
     }
 
@@ -346,7 +340,7 @@ public class ExamServiceImpl implements ExamService {
         if (record == null) {
             throw new BusinessException("考试记录不存在");
         }
-        if (!SecurityUtil.isAdmin() && !record.getUserId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new BusinessException("无权查看此考试记录");
         }
         List<ExamQuestion> examQuestions = examQuestionMapper.selectByExamId(record.getExamId());
@@ -357,7 +351,7 @@ public class ExamServiceImpl implements ExamService {
 
         // 按 sessionId 精确查询本次考试的答题记录，避免多次考试混在一起
         LambdaQueryWrapper<AnswerRecord> answerWrapper = new LambdaQueryWrapper<>();
-        answerWrapper.eq(!SecurityUtil.isAdmin(), AnswerRecord::getUserId, userId);
+        answerWrapper.eq(AnswerRecord::getUserId, userId);
         if (record.getSessionId() != null) {
             answerWrapper.eq(AnswerRecord::getSessionId, record.getSessionId());
         } else {
@@ -391,7 +385,7 @@ public class ExamServiceImpl implements ExamService {
     public List<ExamRecord> getActiveRecords(Long userId) {
         return examRecordMapper.selectList(
                 new LambdaQueryWrapper<ExamRecord>()
-                        .eq(!SecurityUtil.isAdmin(), ExamRecord::getUserId, userId)
+                        .eq(ExamRecord::getUserId, userId)
                         .in(ExamRecord::getStatus, "in_progress", "paused")
                         .orderByDesc(ExamRecord::getCreatedAt));
     }

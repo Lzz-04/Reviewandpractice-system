@@ -132,9 +132,10 @@ const rules = {
 const formRef = ref(null)
 const loading = ref(false)
 
-// 如果已登录，直接跳转首页
+// 如果已登录，根据角色跳转
 if (authStore.isAuthenticated) {
-  router.replace('/')
+  const target = authStore.user?.role === 'admin' ? '/admin' : '/'
+  router.replace(target)
 }
 
 const handleRegister = async () => {

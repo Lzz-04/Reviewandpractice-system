@@ -21,20 +21,10 @@ CREATE TABLE IF NOT EXISTS subjects (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 章节表
-CREATE TABLE IF NOT EXISTS chapters (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    subject_id INT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    sort_order INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (subject_id) REFERENCES subjects(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 题目表
 CREATE TABLE IF NOT EXISTS questions (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    chapter_id INT NOT NULL,
     subject_id INT NOT NULL,
     type VARCHAR(10) NOT NULL COMMENT 'single/multiple/judge',
     content TEXT NOT NULL,
@@ -43,7 +33,6 @@ CREATE TABLE IF NOT EXISTS questions (
     analysis TEXT DEFAULT NULL,
     difficulty TINYINT DEFAULT 1 COMMENT '难度1-5',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (chapter_id) REFERENCES chapters(id),
     FOREIGN KEY (subject_id) REFERENCES subjects(id),
     CONSTRAINT chk_type CHECK (type IN ('single','multiple','judge')),
     CONSTRAINT chk_difficulty CHECK (difficulty BETWEEN 1 AND 5)
@@ -109,7 +98,6 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
     id INT PRIMARY KEY AUTO_INCREMENT,
     question_id INT NOT NULL,
     subject_id INT NOT NULL,
-    chapter_id INT NOT NULL,
     wrong_count INT DEFAULT 1,
     last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     reviewed_count INT DEFAULT 0,
@@ -118,7 +106,6 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
     user_id BIGINT NOT NULL DEFAULT 0,
     FOREIGN KEY (question_id) REFERENCES questions(id),
     FOREIGN KEY (subject_id) REFERENCES subjects(id),
-    FOREIGN KEY (chapter_id) REFERENCES chapters(id),
     UNIQUE KEY uk_user_question (user_id, question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -134,14 +121,12 @@ ALTER TABLE answer_records ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFA
 ALTER TABLE wrong_questions ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE exam_records ADD COLUMN IF NOT EXISTS current_index INT DEFAULT 0 COMMENT '暂停时当前题目序号';
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE chapters ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE exam_papers ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user' COMMENT '角色: admin/user';
 ALTER TABLE subjects ADD UNIQUE INDEX idx_subjects_name (name);
 
 -- 索引
-CREATE INDEX idx_questions_chapter ON questions(chapter_id);
 CREATE INDEX idx_questions_subject ON questions(subject_id);
 CREATE INDEX idx_questions_type ON questions(type);
 CREATE INDEX idx_questions_difficulty ON questions(difficulty);
@@ -155,4 +140,3 @@ CREATE INDEX idx_wrong_questions_subject ON wrong_questions(subject_id);
 CREATE INDEX idx_wrong_questions_user ON wrong_questions(user_id);
 CREATE INDEX idx_exam_records_user ON exam_records(user_id);
 CREATE INDEX idx_answer_records_user ON answer_records(user_id);
-CREATE INDEX idx_chapters_subject ON chapters(subject_id);

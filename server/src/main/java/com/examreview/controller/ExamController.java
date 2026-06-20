@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import com.examreview.service.AIService;
+
 import com.examreview.entity.Question;
 
 @RestController
@@ -20,6 +22,7 @@ import com.examreview.entity.Question;
 public class ExamController {
 
     private final ExamService examService;
+    private final AIService aiService;
 
     @GetMapping
     public ApiResponse<Page<ExamPaper>> getList(
@@ -89,9 +92,30 @@ public class ExamController {
         return ApiResponse.ok(examService.getExamQuestions(id, SecurityUtil.getCurrentUserId()));
     }
 
+    /** AI 考试总结 */
+    @GetMapping("/records/{id}/ai-summary")
+    public ApiResponse<String> getAISummary(@PathVariable Integer id) {
+        ExamResultDTO result = examService.getRecordDetail(id, SecurityUtil.getCurrentUserId());
+        StringBuilder sb = new StringBuilder();
+        sb.append("分数：").append(result.getScore()).append("/100\n");
+        sb.append("正确：").append(result.getCorrectCount()).append("题 / 错误：").append(result.getWrongCount()).append("题 / 总计：").append(result.getTotalQuestions()).append("题\n");
+        sb.append("用时：").append(result.getDurationUsed() != null ? result.getDurationUsed() / 60 + "分钟" : "未知").append("\n");
+        if (result.getQuestions() != null) {
+            sb.append("答错题目：\n");
+            result.getQuestions().stream().filter(q -> !q.getIsCorrect()).forEach(q ->
+                sb.append("- [").append(q.getType()).append("] ").append(truncate(q.getContent(), 50)).append(" (正确答案:").append(q.getCorrectAnswer()).append(" 你的答案:").append(q.getSelectedAnswer()).append(")\n"));
+        }
+        String system = "你是一位学习辅导专家。请根据考试成绩给出综合评价、薄弱环节分析和针对性建议（200字以内）。";
+        return ApiResponse.ok(aiService.analyze(system, sb.toString()));
+    }
+
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteExam(@PathVariable Integer id) {
         examService.deleteExam(id, SecurityUtil.getCurrentUserId());
         return ApiResponse.ok(null, "删除成功");
+    }
+
+    private String truncate(String s, int max) {
+        return s != null && s.length() > max ? s.substring(0, max) + "..." : s;
     }
 }

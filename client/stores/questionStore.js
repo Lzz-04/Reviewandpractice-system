@@ -18,9 +18,9 @@ export const useQuestionStore = defineStore('question', () => {
 
   const answeredCount = computed(() => Object.keys(answers.value).length)
 
-  async function startSession(chapterId, practiceMode = 'random', wrongOnly = false) {
+  async function startSession(subjectId, practiceMode = 'random', wrongOnly = false) {
     const api = useApi()
-    const data = await api.get(`/practice/start/${chapterId}`, { mode: practiceMode, wrongOnly })
+    const data = await api.get(`/practice/start/subject/${subjectId}`, { mode: practiceMode, wrongOnly })
     sessionId.value = data.sessionId
     questions.value = data.questions
     currentIndex.value = 0

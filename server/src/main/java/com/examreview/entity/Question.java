@@ -12,7 +12,6 @@ public class Question {
 
     @TableId(type = IdType.AUTO)
     private Integer id;
-    private Integer chapterId;
     private Integer subjectId;
     private String type;
     private String content;

@@ -92,9 +92,10 @@ const rules = {
 const formRef = ref(null)
 const loading = ref(false)
 
-// 如果已登录，直接跳转首页
+// 如果已登录，根据角色跳转
 if (authStore.isAuthenticated) {
-  router.replace('/')
+  const target = authStore.user?.role === 'admin' ? '/admin' : '/'
+  router.replace(target)
 }
 
 const handleLogin = async () => {
@@ -106,7 +107,8 @@ const handleLogin = async () => {
   loading.value = false
 
   if (success) {
-    const redirect = route.query.redirect || '/'
+    const isAdmin = authStore.user?.role === 'admin'
+    const redirect = route.query.redirect || (isAdmin ? '/admin' : '/')
     router.replace(redirect)
   }
 }

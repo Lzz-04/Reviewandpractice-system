@@ -14,7 +14,6 @@ public class WrongQuestion {
     private Integer id;
     private Integer questionId;
     private Integer subjectId;
-    private Integer chapterId;
     private Integer wrongCount;
     private LocalDateTime lastWrongAt;
     private Integer reviewedCount;

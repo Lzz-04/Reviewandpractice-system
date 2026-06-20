@@ -14,26 +14,28 @@
       </div>
 
       <nav class="sidebar-nav">
-        <NuxtLink to="/" class="nav-item" :class="{ active: route.path === '/' }">
-          <span class="nav-icon"><HomeFilled /></span>
-          <span class="nav-label">首页仪表盘</span>
-        </NuxtLink>
-        <NuxtLink to="/subjects" class="nav-item" :class="{ active: route.path.startsWith('/subject') || route.path === '/subjects' }">
-          <span class="nav-icon"><Collection /></span>
-          <span class="nav-label">科目管理</span>
-        </NuxtLink>
-        <NuxtLink to="/exam" class="nav-item" :class="{ active: route.path.startsWith('/exam') }">
-          <span class="nav-icon"><Tickets /></span>
-          <span class="nav-label">模拟考试</span>
-        </NuxtLink>
-        <NuxtLink to="/wrongbook" class="nav-item" :class="{ active: route.path === '/wrongbook' }">
-          <span class="nav-icon"><WarningFilled /></span>
-          <span class="nav-label">错题本</span>
-        </NuxtLink>
-        <NuxtLink to="/stats" class="nav-item" :class="{ active: route.path === '/stats' }">
-          <span class="nav-icon"><DataAnalysis /></span>
-          <span class="nav-label">学习统计</span>
-        </NuxtLink>
+        <template v-if="authStore.user?.role !== 'admin'">
+          <NuxtLink to="/" class="nav-item" :class="{ active: route.path === '/' }">
+            <span class="nav-icon"><HomeFilled /></span>
+            <span class="nav-label">首页仪表盘</span>
+          </NuxtLink>
+          <NuxtLink to="/subjects" class="nav-item" :class="{ active: route.path.startsWith('/subject') || route.path === '/subjects' }">
+            <span class="nav-icon"><Collection /></span>
+            <span class="nav-label">科目管理</span>
+          </NuxtLink>
+          <NuxtLink to="/exam" class="nav-item" :class="{ active: route.path.startsWith('/exam') }">
+            <span class="nav-icon"><Tickets /></span>
+            <span class="nav-label">模拟考试</span>
+          </NuxtLink>
+          <NuxtLink to="/wrongbook" class="nav-item" :class="{ active: route.path === '/wrongbook' }">
+            <span class="nav-icon"><WarningFilled /></span>
+            <span class="nav-label">错题本</span>
+          </NuxtLink>
+          <NuxtLink to="/stats" class="nav-item" :class="{ active: route.path === '/stats' }">
+            <span class="nav-icon"><DataAnalysis /></span>
+            <span class="nav-label">学习统计</span>
+          </NuxtLink>
+        </template>
         <NuxtLink v-if="authStore.user?.role === 'admin'" to="/admin" class="nav-item" :class="{ active: route.path === '/admin' }">
           <span class="nav-icon"><Setting /></span>
           <span class="nav-label">管理后台</span>
@@ -310,8 +312,6 @@ const handleLogout = () => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-
 
 .logout-btn {
   flex-shrink: 0;

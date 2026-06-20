@@ -18,5 +18,15 @@ export default defineNuxtRouteMiddleware((to) => {
     if (token && publicRoutes.includes(to.path)) {
       return navigateTo('/')
     }
+
+    // 管理员只能访问管理后台，不允许进入用户端页面
+    if (token && to.path !== '/admin' && !publicRoutes.includes(to.path)) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        if (payload.role === 'admin') {
+          return navigateTo('/admin')
+        }
+      } catch {}
+    }
   }
 })

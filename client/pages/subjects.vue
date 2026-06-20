@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2>科目管理</h2>
-        <p>管理你的学习科目，进入章节开始刷题</p>
+        <p>管理你的学习科目，进入科目开始刷题</p>
       </div>
       <el-button type="primary" size="large" @click="showCreate = true">
         <el-icon style="margin-right: 6px"><Plus /></el-icon>添加科目

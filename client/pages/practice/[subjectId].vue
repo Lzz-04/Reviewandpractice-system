@@ -83,7 +83,7 @@
       </div>
     </div>
 
-    <el-empty v-else-if="!loading" description="该章节暂无题目" />
+    <el-empty v-else-if="!loading" description="该科目暂无题目" />
   </div>
 </template>
 
@@ -101,21 +101,21 @@ const practiceMode = ref('all')
 async function startWithMode(mode) {
   loading.value = true
   try {
-    const chapterId = route.params.chapterId
-    await store.startSession(chapterId, 'random', mode === 'wrong')
+    const subjectId = route.params.subjectId
+    await store.startSession(subjectId, 'random', mode === 'wrong')
   } finally { loading.value = false }
 }
 
 onMounted(async () => {
   loading.value = true
   try {
-    const chapterId = route.params.chapterId
+    const subjectId = route.params.subjectId
     // 如果 store 中已有错题数据（从错题本页面跳转过来），直接使用
     if (store.questions.length > 0 && store.mode === 'wrong') {
       loading.value = false
       return
     }
-    await store.startSession(chapterId, 'random')
+    await store.startSession(subjectId, 'random')
   } finally { loading.value = false }
 })
 

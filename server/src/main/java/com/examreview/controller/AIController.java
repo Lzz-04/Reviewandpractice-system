@@ -5,6 +5,7 @@ import com.examreview.dto.AIGeneratedQuestion;
 import com.examreview.dto.ApiResponse;
 import com.examreview.service.AIService;
 import jakarta.validation.Valid;
+import com.examreview.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,7 +23,7 @@ public class AIController {
      */
     @PostMapping("/generate")
     public ApiResponse<List<AIGeneratedQuestion>> generate(@RequestBody @Valid AIGenerateRequest request) {
-        List<AIGeneratedQuestion> questions = aiService.generate(request);
+        List<AIGeneratedQuestion> questions = aiService.generate(request, SecurityUtil.getCurrentUserId());
         return ApiResponse.ok(questions, "AI 已生成 " + questions.size() + " 道题目");
     }
 }

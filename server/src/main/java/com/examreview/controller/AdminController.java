@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * 管理后台控制器
+ * 提供管理员专属功能，包括用户列表查询和用户删除（级联清理所有关联数据）
+ * 所有接口均需 admin 角色权限
+ */
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
@@ -19,7 +24,6 @@ public class AdminController {
 
     private final UserMapper userMapper;
     private final SubjectMapper subjectMapper;
-    private final ChapterMapper chapterMapper;
     private final QuestionMapper questionMapper;
     private final ExamPaperMapper examPaperMapper;
     private final ExamQuestionMapper examQuestionMapper;
@@ -29,6 +33,9 @@ public class AdminController {
 
     /**
      * 获取所有用户列表及统计数据
+     * 包含每个用户的科目数、题目数、考试数、错题数、答题记录数
+     *
+     * @return 用户列表及统计信息
      */
     @GetMapping("/users")
     public ApiResponse<List<Map<String, Object>>> getUsers() {
@@ -61,25 +68,33 @@ public class AdminController {
 
     /**
      * 删除用户及其所有关联数据
+     * 级联删除顺序：答题记录 → 错题本 → 考试记录 → 试卷及关联题目 → 题目 → 科目 → 用户
+     *
+     * @param id 用户ID
+     * @return 操作结果
      */
     @DeleteMapping("/users/{id}")
     @Transactional
     public ApiResponse<Void> deleteUser(@PathVariable Long id) {
+        // 权限校验
         if (!SecurityUtil.isAdmin()) {
             throw new BusinessException(403, "无权访问");
         }
+        // 禁止删除自己
         if (SecurityUtil.getCurrentUserId().equals(id)) {
             throw new BusinessException("不能删除自己的账号");
         }
+        // 用户存在性检查
         User user = userMapper.selectById(id);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
+        // 禁止删除管理员
         if ("admin".equals(user.getRole())) {
             throw new BusinessException("不能删除管理员账号");
         }
 
-        // 删除答题记录
+        // 级联删除答题记录
         answerRecordMapper.delete(
                 new LambdaQueryWrapper<AnswerRecord>().eq(AnswerRecord::getUserId, id));
         // 删除错题本
@@ -101,9 +116,6 @@ public class AdminController {
         // 删除题目
         questionMapper.delete(
                 new LambdaQueryWrapper<Question>().eq(Question::getUserId, id));
-        // 删除章节
-        chapterMapper.delete(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getUserId, id));
         // 删除科目
         subjectMapper.delete(
                 new LambdaQueryWrapper<Subject>().eq(Subject::getUserId, id));

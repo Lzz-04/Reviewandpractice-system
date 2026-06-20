@@ -2,7 +2,9 @@ package com.examreview.service.impl;
 
 import com.examreview.dto.AIGenerateRequest;
 import com.examreview.dto.AIGeneratedQuestion;
+import com.examreview.entity.Question;
 import com.examreview.exception.BusinessException;
+import com.examreview.mapper.QuestionMapper;
 import com.examreview.service.AIService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,13 +28,16 @@ public class AIServiceImpl implements AIService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final String model;
+    private final QuestionMapper questionMapper;
 
     public AIServiceImpl(@Value("${deepseek.api-key}") String apiKey,
                          @Value("${deepseek.base-url}") String baseUrl,
                          @Value("${deepseek.model}") String model,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper,
+                         QuestionMapper questionMapper) {
         this.model = model;
         this.objectMapper = objectMapper;
+        this.questionMapper = questionMapper;
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
@@ -41,9 +46,9 @@ public class AIServiceImpl implements AIService {
     }
 
     @Override
-    public List<AIGeneratedQuestion> generate(AIGenerateRequest request) {
+    public List<AIGeneratedQuestion> generate(AIGenerateRequest request, Long userId) {
         String systemPrompt = buildSystemPrompt();
-        String userPrompt = buildUserPrompt(request);
+        String userPrompt = buildUserPrompt(request, userId);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
@@ -89,13 +94,12 @@ public class AIServiceImpl implements AIService {
     }
 
     /**
-     * 构建用户提示词（参数化）
+     * 构建用户提示词（参数化，包含已有题库样例）
      */
-    private String buildUserPrompt(AIGenerateRequest req) {
+    private String buildUserPrompt(AIGenerateRequest req, Long userId) {
         StringBuilder sb = new StringBuilder();
         sb.append("请为以下学科出题：\n\n");
         sb.append("科目：").append(req.getSubjectName()).append("\n");
-        sb.append("章节：").append(req.getChapterName()).append("\n");
 
         if (req.getType() != null && !"mixed".equals(req.getType())) {
             String typeName = switch (req.getType()) {
@@ -111,6 +115,28 @@ public class AIServiceImpl implements AIService {
 
         sb.append("难度：").append(req.getDifficulty()).append("（1=非常简单, 2=简单, 3=中等, 4=较难, 5=困难）\n");
         sb.append("数量：").append(req.getCount()).append("道\n");
+
+        // 获取已有题库作为参考样例
+        List<Question> existing = questionMapper.selectBySubject(req.getSubjectId(), userId);
+        if (existing != null && !existing.isEmpty()) {
+            Collections.shuffle(existing);
+            List<Question> samples = existing.subList(0, Math.min(10, existing.size()));
+            sb.append("\n请参考以下已有题库样例，生成风格和难度相似但内容不同的新题目：\n");
+            for (Question q : samples) {
+                String typeName = switch (q.getType()) {
+                    case "single" -> "单选";
+                    case "multiple" -> "多选";
+                    case "judge" -> "判断";
+                    default -> q.getType();
+                };
+                String truncated = q.getContent().length() > 80
+                        ? q.getContent().substring(0, 80) + "…"
+                        : q.getContent();
+                sb.append("- [").append(typeName).append("][难度").append(q.getDifficulty()).append("] ")
+                        .append(truncated).append("\n");
+            }
+            sb.append("\n注意：生成的题目不得与上述样例重复，但应保持相似的出题风格和知识点覆盖面。\n");
+        }
 
         sb.append("""
 

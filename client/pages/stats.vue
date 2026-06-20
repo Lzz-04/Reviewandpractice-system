@@ -50,18 +50,6 @@
       <div v-else class="ai-empty">点击生成 AI 定制的复习计划</div>
     </div>
 
-    <!-- 图表区 -->
-    <div class="charts-grid">
-      <div class="chart-panel">
-        <div class="chart-header">正确率趋势（近{{ trendDays }}天）</div>
-        <div class="chart-body" ref="trendChartRef" v-loading="loadingTrend"></div>
-      </div>
-      <div class="chart-panel">
-        <div class="chart-header">每日答题量（近{{ activityDays }}天）</div>
-        <div class="chart-body" ref="activityChartRef" v-loading="loadingActivity"></div>
-      </div>
-    </div>
-
     <!-- 科目进度 -->
     <div class="list-panel">
       <div class="list-header">各科目答题进度</div>
@@ -90,16 +78,10 @@ import { Document, DataAnalysis, Tickets, Timer, Loading } from '@element-plus/i
 const api = useApi()
 const overview = ref({})
 const subjectProgress = ref([])
-const trendDays = ref(7)
-const activityDays = ref(30)
-const loadingTrend = ref(false)
-const loadingActivity = ref(false)
 const loadingAI = ref(false)
 const loadingPlan = ref(false)
 const aiAnalysis = ref('')
 const studyPlan = ref('')
-const trendChartRef = ref(null)
-const activityChartRef = ref(null)
 
 const hasData = computed(() => (overview.value.totalAnswered || 0) > 0)
 
@@ -122,46 +104,6 @@ async function loadSubjectProgress() {
   try { subjectProgress.value = await api.get('/stats/subject/progress') } catch {}
 }
 
-async function loadTrendChart() {
-  loadingTrend.value = true
-  try {
-    const data = await api.get('/stats/accuracy/trend', { days: trendDays.value })
-    if (typeof echarts === 'undefined') return
-    const chart = echarts.init(trendChartRef.value)
-    chart.setOption({
-      tooltip: { trigger: 'axis' },
-      grid: { left: 40, right: 20, top: 20, bottom: 30 },
-      xAxis: { type: 'category', data: data.map(d => d.date), axisLabel: { fontSize: 11 } },
-      yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
-      series: [{
-        data: data.map(d => d.accuracy), type: 'line', smooth: true,
-        lineStyle: { color: '#3b5dbf', width: 2 },
-        areaStyle: { color: 'rgba(59,93,191,0.08)' },
-        itemStyle: { color: '#3b5dbf' },
-      }],
-    })
-  } catch {} finally { loadingTrend.value = false }
-}
-
-async function loadActivityChart() {
-  loadingActivity.value = true
-  try {
-    const data = await api.get('/stats/daily/activity', { days: activityDays.value })
-    if (typeof echarts === 'undefined') return
-    const chart = echarts.init(activityChartRef.value)
-    chart.setOption({
-      tooltip: { trigger: 'axis' },
-      grid: { left: 40, right: 20, top: 20, bottom: 30 },
-      xAxis: { type: 'category', data: data.map(d => d.date), axisLabel: { fontSize: 11 } },
-      yAxis: { type: 'value', minInterval: 1 },
-      series: [{
-        data: data.map(d => d.count), type: 'bar',
-        itemStyle: { color: '#3b5dbf', borderRadius: [4, 4, 0, 0] },
-      }],
-    })
-  } catch {} finally { loadingActivity.value = false }
-}
-
 async function loadAIAnalysis() {
   loadingAI.value = true
   try { aiAnalysis.value = await api.get('/stats/ai-analysis') } catch {} finally { loadingAI.value = false }
@@ -174,7 +116,6 @@ async function loadStudyPlan() {
 
 onMounted(async () => {
   await Promise.all([loadOverview(), loadSubjectProgress()])
-  await Promise.all([loadTrendChart(), loadActivityChart()])
 })
 </script>
 
@@ -199,19 +140,12 @@ onMounted(async () => {
 .stat-value { font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1.1; }
 .stat-label { font-size: 12px; color: #94a3b8; margin-top: 2px; }
 
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-@media (max-width: 800px) { .charts-grid { grid-template-columns: 1fr; } }
-
 /* AI Panel */
 .ai-panel { background: #fff; border: 1px solid #e8e5df; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
 .ai-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #f0ede7; font-weight: 650; font-size: 15px; color: #1e293b; }
 .ai-loading { display: flex; align-items: center; gap: 10px; padding: 24px; color: #94a3b8; font-size: 14px; }
 .ai-content { padding: 20px; font-size: 14px; line-height: 1.8; color: #334155; white-space: pre-wrap; }
 .ai-empty { padding: 24px; text-align: center; color: #94a3b8; font-size: 14px; }
-
-.chart-panel { background: #fff; border: 1px solid #e8e5df; border-radius: 12px; overflow: hidden; }
-.chart-header { padding: 14px 18px; border-bottom: 1px solid #f0ede7; font-weight: 650; font-size: 14px; color: #1e293b; }
-.chart-body { width: 100%; height: 260px; }
 
 .list-panel { background: #fff; border: 1px solid #e8e5df; border-radius: 12px; overflow: hidden; }
 .list-header { padding: 14px 18px; border-bottom: 1px solid #f0ede7; font-weight: 650; font-size: 14px; color: #1e293b; }

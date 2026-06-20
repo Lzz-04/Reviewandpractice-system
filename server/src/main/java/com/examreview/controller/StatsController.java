@@ -26,31 +26,18 @@ public class StatsController {
         return ApiResponse.ok(statsService.getOverview());
     }
 
-    @GetMapping("/accuracy/trend")
-    public ApiResponse<List<Map<String, Object>>> getAccuracyTrend(@RequestParam(defaultValue = "7") int days) {
-        if (days <= 0) return ApiResponse.fail("查询天数必须大于0");
-        return ApiResponse.ok(statsService.getAccuracyTrend(days));
-    }
-
     @GetMapping("/subject/progress")
     public ApiResponse<List<Map<String, Object>>> getSubjectProgress() {
         return ApiResponse.ok(statsService.getSubjectProgress());
     }
 
-    @GetMapping("/daily/activity")
-    public ApiResponse<List<Map<String, Object>>> getDailyActivity(@RequestParam(defaultValue = "30") int days) {
-        if (days <= 0) return ApiResponse.fail("查询天数必须大于0");
-        return ApiResponse.ok(statsService.getDailyActivity(days));
-    }
-
     /** AI 学习分析 */
     @GetMapping("/ai-analysis")
     public ApiResponse<String> getAIAnalysis() {
-        Long userId = SecurityUtil.isAdmin() ? null : SecurityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
 
         // 收集统计数据
         StatsOverviewDTO overview = statsService.getOverview();
-        List<Map<String, Object>> trend = statsService.getAccuracyTrend(7);
         List<Map<String, Object>> progress = statsService.getSubjectProgress();
         List<Map<String, Object>> weakAreas = wrongQuestionMapper.getUnMasteredDistribution(userId);
 
@@ -64,14 +51,6 @@ public class StatsController {
         userPrompt.append("整体正确率：").append(overview.getOverallAccuracy()).append("%\n");
         userPrompt.append("学习天数：").append(overview.getStudyDays()).append(" 天\n");
         userPrompt.append("今日答题数：").append(overview.getTodayAnswered()).append("\n\n");
-
-        if (!trend.isEmpty()) {
-            userPrompt.append("【近7天正确率趋势】\n");
-            for (Map<String, Object> t : trend) {
-                userPrompt.append(t.get("date")).append(": 正确率 ").append(t.get("accuracy")).append("%\n");
-            }
-            userPrompt.append("\n");
-        }
 
         if (!progress.isEmpty()) {
             userPrompt.append("【各科目进度】\n");
@@ -103,7 +82,7 @@ public class StatsController {
     /** AI 复习计划 */
     @GetMapping("/study-plan")
     public ApiResponse<String> getStudyPlan() {
-        Long userId = SecurityUtil.isAdmin() ? null : SecurityUtil.getCurrentUserId();
+        Long userId = SecurityUtil.getCurrentUserId();
         StatsOverviewDTO overview = statsService.getOverview();
         List<Map<String, Object>> weakAreas = wrongQuestionMapper.getUnMasteredDistribution(userId);
         List<Map<String, Object>> progress = statsService.getSubjectProgress();

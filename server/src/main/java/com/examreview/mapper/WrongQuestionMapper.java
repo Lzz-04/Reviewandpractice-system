@@ -14,6 +14,6 @@ public interface WrongQuestionMapper extends BaseMapper<WrongQuestion> {
 
     @Select("SELECT s.name as subjectName, COUNT(w.id) as count " +
             "FROM wrong_questions w JOIN subjects s ON w.subject_id = s.id " +
-            "WHERE w.mastered = 0 AND w.user_id = #{userId} GROUP BY w.subject_id")
+            "WHERE w.mastered = 0 AND (w.user_id = #{userId} OR #{userId} IS NULL) GROUP BY w.subject_id")
     List<Map<String, Object>> getUnMasteredDistribution(@Param("userId") Long userId);
 }

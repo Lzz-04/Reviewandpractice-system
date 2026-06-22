@@ -3,7 +3,7 @@
     <div class="welcome-section">
       <div class="welcome-text">
         <h2>学习仪表盘</h2>
-        <p>欢迎回来，继续你的期末复习之旅</p>
+        <p>欢迎回来，继续你的复习之旅</p>
       </div>
       <div class="welcome-decoration">
         <div class="deco-circle c1"></div>

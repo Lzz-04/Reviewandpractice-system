@@ -12,7 +12,7 @@ import java.io.IOException;
 
 /**
  * 文件导入控制器
- * 处理题目批量导入和预览功能，支持 XLSX/DOCX/PDF/TXT 四种格式
+ * 处理题目批量导入和预览功能，支持 XLSX/DOCX/TXT 四种格式
  */
 @RestController
 @RequestMapping("/api/import")
@@ -25,7 +25,7 @@ public class ImportController {
      * 导入题目
      * 解析上传文件，批量导入题目到指定科目
      *
-     * @param file      上传的文件（XLSX/DOCX/PDF/TXT）
+     * @param file      上传的文件（XLSX/DOCX/TXT）
      * @param subjectId 科目ID
      * @return 导入结果（总数/成功数/失败数/错误详情）
      */

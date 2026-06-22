@@ -14,7 +14,7 @@
             </defs>
           </svg>
         </div>
-        <h1 class="auth-title">期末刷题助手</h1>
+        <h1 class="auth-title">复习刷题助手</h1>
         <p class="auth-subtitle">登录你的账号，继续学习之旅</p>
       </div>
 

@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 
 /**
  * 文件导入服务实现类
- * 支持 XLSX/DOCX/PDF/TXT 四种格式的题目解析和批量导入
+ * 支持 XLSX/DOCX/TXT 三种格式的题目解析和批量导入
  * 文本解析支持两种模式：标准标签格式和试卷格式自动识别
  */
 @Service
@@ -45,9 +45,8 @@ public class ImportServiceImpl implements ImportService {
         List<Question> questions = switch (ext) {
             case "xlsx" -> parseXlsx(file, null);
             case "docx" -> parseDocx(file, null);
-            case "pdf" -> parsePdf(file, null);
             case "txt" -> parseTxt(file, null);
-            default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、pdf、xlsx、txt");
+            default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、xlsx、txt");
         };
 
         // 只取前 10 道单选题用于预览
@@ -91,9 +90,8 @@ public class ImportServiceImpl implements ImportService {
         List<Question> questions = switch (ext) {
             case "xlsx" -> parseXlsx(file, subjectId);
             case "docx" -> parseDocx(file, subjectId);
-            case "pdf" -> parsePdf(file, subjectId);
             case "txt" -> parseTxt(file, subjectId);
-            default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、pdf、xlsx、txt");
+            default -> throw new IllegalArgumentException("不支持的文件格式：" + ext + "，仅支持 docx、xlsx、txt");
         };
 
         // 统计导入结果
@@ -172,21 +170,6 @@ public class ImportServiceImpl implements ImportService {
             return parseText(sb.toString(), subjectId);
         }
     }
-
-    // ==================== PDF 解析 ====================
-    
-    /**
-     * 解析 PDF 文档
-     * 使用 PDFBox 提取文本后，调用文本解析器处理
-     */
-    private List<Question> parsePdf(MultipartFile file, Integer subjectId) throws IOException {
-        try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String text = stripper.getText(doc);
-            return parseText(text, subjectId);
-        }
-    }
-
     // ==================== TXT 解析 ====================
     
     /**
@@ -198,7 +181,7 @@ public class ImportServiceImpl implements ImportService {
         return parseText(text, subjectId);
     }
 
-    // ==================== 文本格式解析（DOCX/PDF/TXT 通用） ====================
+    // ==================== 文本格式解析（DOCX/TXT 通用） ====================
     
     /**
      * 文本格式解析入口

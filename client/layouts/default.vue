@@ -10,7 +10,7 @@
             <defs><linearGradient id="g1" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#3b5dbf"/><stop offset="1" stop-color="#5876d8"/></linearGradient></defs>
           </svg>
         </div>
-        <span class="brand-text">期末刷题助手</span>
+        <span class="brand-text">复习刷题助手</span>
       </div>
 
       <nav class="sidebar-nav">

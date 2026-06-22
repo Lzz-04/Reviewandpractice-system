@@ -15,7 +15,7 @@ public interface ImportService {
      * 导入题目
      * 解析上传文件，批量导入题目到指定科目
      *
-     * @param file      上传的文件（XLSX/DOCX/PDF/TXT）
+     * @param file      上传的文件（XLSX/DOCX/TXT）
      * @param subjectId 科目 ID
      * @param userId    用户 ID
      * @return 导入结果（总数/成功数/失败数/错误详情）

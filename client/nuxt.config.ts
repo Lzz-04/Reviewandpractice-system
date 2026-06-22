@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   css: ['element-plus/dist/index.css', '@/assets/css/global.css'],
   app: {
     head: {
-      title: '期末复习刷题系统',
+      title: '复习刷题系统',
       charset: 'utf-8',
       viewport: 'width=device-width, initial-scale=1',
     },

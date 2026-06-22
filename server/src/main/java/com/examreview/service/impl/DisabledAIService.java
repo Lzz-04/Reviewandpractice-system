@@ -20,7 +20,7 @@ public class DisabledAIService implements AIService {
     private static final String DISABLED_MSG = "AI 功能未启用，请在 application.yml 中设置 deepseek.enabled=true 并配置有效的 API Key";
 
     @Override
-    public List<AIGeneratedQuestion> generate(AIGenerateRequest request) {
+    public List<AIGeneratedQuestion> generate(AIGenerateRequest request, Long userId) {
         throw new BusinessException(DISABLED_MSG);
     }
 

@@ -167,10 +167,6 @@ npm run dev
 | AI 辅助 | `/api/ai` | POST generate |
 | 管理后台 | `/api/admin` | GET users, DELETE users/{id} |
 
-## 团队分工
-
-详见 [docs/团队分工方案.md](docs/团队分工方案.md) 和 [docs/系统模块说明.md](docs/系统模块说明.md)。
-
 ## 许可证
 
 MIT License — 详见 [LICENSE](LICENSE) 文件
